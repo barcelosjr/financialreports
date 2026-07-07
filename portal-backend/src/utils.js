@@ -11,4 +11,17 @@ function handlePowerBIError(err, res, fallbackMessage) {
   return res.status(500).json({ error: fallbackMessage });
 }
 
-module.exports = { handlePowerBIError };
+/**
+ * Escapa um valor de texto vindo do usuario antes de interpola-lo numa
+ * string literal DAX (dobra aspas duplas, regra de escaping do DAX, e
+ * rejeita quebras de linha/caracteres de controle) para evitar DAX injection
+ * em filtros construidos a partir de query params (ex: ?conta=).
+ */
+function escapeDaxString(value) {
+  if (/[\r\n\t]/.test(value)) {
+    throw new Error('Valor contém caracteres inválidos.');
+  }
+  return value.replace(/"/g, '""');
+}
+
+module.exports = { handlePowerBIError, escapeDaxString };

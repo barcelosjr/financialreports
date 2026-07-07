@@ -1,0 +1,25 @@
+# Exemplo de reverse proxy Nginx para o portal-backend rodando localmente
+# (via PM2) na porta 3000, expondo apenas 80/443 publicamente no VPS Hostinger.
+#
+# 1. Copie para /etc/nginx/sites-available/portal-backend
+# 2. Ajuste "api.seudominio.com.br" para o seu domínio/subdomínio real
+# 3. sudo ln -s /etc/nginx/sites-available/portal-backend /etc/nginx/sites-enabled/
+# 4. sudo nginx -t && sudo systemctl reload nginx
+# 5. sudo certbot --nginx -d api.seudominio.com.br   (emite/renova o certificado HTTPS)
+
+server {
+    listen 80;
+    server_name api.seudominio.com.br;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Após rodar o certbot acima, ele adiciona automaticamente um bloco "listen 443 ssl"
+# equivalente com os certificados do Let's Encrypt e o redirect de 80 -> 443.

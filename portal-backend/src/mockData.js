@@ -1,70 +1,52 @@
 /**
- * Dados ficticios usados apenas quando MOCK_MODE=true (sem modelo semantico
- * real publicado ainda). Espelham as tabelas descritas no briefing do
- * projeto, para que os endpoints funcionem localmente sem credenciais Azure.
+ * Dados ficticios usados apenas quando MOCK_MODE=true, espelhando a
+ * estrutura real da tabela LANCAMENTOS (ver README) para permitir
+ * desenvolvimento/teste local sem credenciais Azure/Power BI.
  */
 
-const PRODUTOS = [
-  { ProdutoID: 1, Nome: 'Parafuso M6', Categoria: 'Ferragem' },
-  { ProdutoID: 2, Nome: 'Chapa Aço 2mm', Categoria: 'Metalurgia' },
-  { ProdutoID: 3, Nome: 'Tinta Epóxi 5L', Categoria: 'Pintura' },
+const LANCAMENTOS = [
+  { EMPRESA: '001', CONTA: '3.1.01.001', DESCRICAO_CONTA: 'Receita de Vendas', CENTRO_CUSTO: 10, DESCRICAO_CC: 'Comercial', NATUREZA: 'C', VALOR: 45000.0, PERIODO: '07/2026' },
+  { EMPRESA: '001', CONTA: '3.1.01.001', DESCRICAO_CONTA: 'Receita de Vendas', CENTRO_CUSTO: 10, DESCRICAO_CC: 'Comercial', NATUREZA: 'D', VALOR: 1250.0, PERIODO: '07/2026' },
+  { EMPRESA: '001', CONTA: '4.1.02.010', DESCRICAO_CONTA: 'Despesas Administrativas', CENTRO_CUSTO: 20, DESCRICAO_CC: 'Administrativo', NATUREZA: 'D', VALOR: 8300.0, PERIODO: '07/2026' },
+  { EMPRESA: '002', CONTA: '3.1.01.001', DESCRICAO_CONTA: 'Receita de Vendas', CENTRO_CUSTO: 10, DESCRICAO_CC: 'Comercial', NATUREZA: 'C', VALOR: 12000.0, PERIODO: '08/2026' },
 ];
 
-const ESTOQUE = [
-  { ProdutoID: 1, Deposito: 'CD-SP', QuantidadeDisponivel: 15000, DataAtualizacao: '2026-07-01' },
-  { ProdutoID: 2, Deposito: 'CD-SP', QuantidadeDisponivel: 320, DataAtualizacao: '2026-07-01' },
-  { ProdutoID: 3, Deposito: 'CD-RJ', QuantidadeDisponivel: 48, DataAtualizacao: '2026-07-01' },
-];
-
-const VENDAS = [
-  { VendaID: 5001, ProdutoID: 1, Quantidade: 500, ValorTotal: 225.0, DataVenda: '2026-06-30', Filial: 'SP-01' },
-  { VendaID: 5002, ProdutoID: 3, Quantidade: 2, ValorTotal: 420.0, DataVenda: '2026-07-01', Filial: 'RJ-02' },
-];
-
-function findProduto(produtoId) {
-  return PRODUTOS.find((p) => p.ProdutoID === Number(produtoId));
+function periodoParaChave(periodo) {
+  const [mes, ano] = periodo.split('/');
+  return `${ano}-${mes}`;
 }
 
-function mockEstoqueGeral() {
-  return ESTOQUE.map((linha) => {
-    const produto = findProduto(linha.ProdutoID);
-    return {
-      produto: produto.Nome,
-      categoria: produto.Categoria,
-      deposito: linha.Deposito,
-      quantidade: linha.QuantidadeDisponivel,
-    };
+function mockBalancete({ empresas, periodoInicio, periodoFim, conta, centroCusto }) {
+  const linhas = LANCAMENTOS.filter((linha) => {
+    const chavePeriodo = periodoParaChave(linha.PERIODO);
+    return (
+      empresas.includes(linha.EMPRESA) &&
+      chavePeriodo >= periodoInicio &&
+      chavePeriodo <= periodoFim &&
+      (conta === undefined || linha.CONTA === conta) &&
+      (centroCusto === undefined || linha.CENTRO_CUSTO === centroCusto)
+    );
   });
-}
 
-function mockEstoquePorProduto(produtoId) {
-  return mockEstoqueGeral().filter((linha) => {
-    const produto = findProduto(produtoId);
-    return produto && linha.produto === produto.Nome;
-  });
-}
-
-function mockVendas(dataInicio, dataFim) {
-  const vendasNoPeriodo = VENDAS.filter(
-    (v) => v.DataVenda >= dataInicio && v.DataVenda <= dataFim
-  );
-
-  const agregadoPorProduto = new Map();
-  for (const venda of vendasNoPeriodo) {
-    const produto = findProduto(venda.ProdutoID);
-    const chave = produto.ProdutoID;
-    const atual = agregadoPorProduto.get(chave) || {
-      produto: produto.Nome,
-      categoria: produto.Categoria,
-      valorTotal: 0,
-      quantidade: 0,
+  const agregado = new Map();
+  for (const linha of linhas) {
+    const chave = `${linha.EMPRESA}|${linha.CONTA}`;
+    const atual = agregado.get(chave) || {
+      empresa: linha.EMPRESA,
+      conta: linha.CONTA,
+      descricaoConta: linha.DESCRICAO_CONTA,
+      debito: 0,
+      credito: 0,
     };
-    atual.valorTotal += venda.ValorTotal;
-    atual.quantidade += venda.Quantidade;
-    agregadoPorProduto.set(chave, atual);
+    if (linha.NATUREZA === 'D') atual.debito += linha.VALOR;
+    if (linha.NATUREZA === 'C') atual.credito += linha.VALOR;
+    agregado.set(chave, atual);
   }
 
-  return Array.from(agregadoPorProduto.values());
+  return Array.from(agregado.values()).map((linha) => ({
+    ...linha,
+    saldo: linha.debito - linha.credito,
+  }));
 }
 
-module.exports = { mockEstoqueGeral, mockEstoquePorProduto, mockVendas, findProduto };
+module.exports = { mockBalancete };

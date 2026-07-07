@@ -8,14 +8,24 @@ try {
   process.exit(1);
 }
 
-const estoqueRouter = require('./routes/estoque');
-const vendasRouter = require('./routes/vendas');
+let apiKeyAuth;
+try {
+  ({ apiKeyAuth } = require('./apiKeyAuth'));
+} catch (err) {
+  console.error(`Erro ao carregar configuração de clientes: ${err.message}`);
+  process.exit(1);
+}
+
+const contabilRouter = require('./routes/contabil');
 
 const app = express();
 app.use(express.json());
 
-app.use('/api/estoque', estoqueRouter);
-app.use('/api/vendas', vendasRouter);
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+app.use('/api/contabil/balancete', apiKeyAuth, contabilRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Rota não encontrada.' });

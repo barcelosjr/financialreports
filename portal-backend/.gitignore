@@ -1,4 +1,6 @@
 node_modules/
 .env
+clients.json
+logs/
 npm-debug.log*
 *.log

@@ -2,6 +2,7 @@ const axios = require('axios');
 const { getAccessToken } = require('./auth');
 const config = require('./config');
 const mock = require('./mockData');
+const { escapeDaxString } = require('./utils');
 
 class PowerBIError extends Error {
   constructor(message, { status, code } = {}) {
@@ -59,75 +60,70 @@ function mapRow(row, mapping) {
   return out;
 }
 
-const ESTOQUE_MAPPING = {
-  'Produtos[Nome]': 'produto',
-  'Produtos[Categoria]': 'categoria',
-  'Estoque[Deposito]': 'deposito',
-  '[Quantidade]': 'quantidade',
+const BALANCETE_MAPPING = {
+  'LANCAMENTOS[EMPRESA]': 'empresa',
+  'LANCAMENTOS[CONTA]': 'conta',
+  'LANCAMENTOS[DESCRICAO_CONTA]': 'descricaoConta',
+  '[Debito]': 'debito',
+  '[Credito]': 'credito',
+  '[Saldo]': 'saldo',
 };
 
-const VENDAS_MAPPING = {
-  'Produtos[Nome]': 'produto',
-  'Produtos[Categoria]': 'categoria',
-  '[ValorTotal]': 'valorTotal',
-  '[Quantidade]': 'quantidade',
-};
-
-async function queryEstoqueGeral() {
-  if (config.MOCK_MODE) return mock.mockEstoqueGeral();
-
-  const dax = `
-EVALUATE
-SUMMARIZECOLUMNS(
-    Produtos[Nome],
-    Produtos[Categoria],
-    Estoque[Deposito],
-    "Quantidade", [Estoque Total]
-)`.trim();
-
-  const rows = await executeDaxQuery(dax);
-  return rows.map((row) => mapRow(row, ESTOQUE_MAPPING));
+function daxStringSet(values) {
+  return `{${values.map((v) => `"${escapeDaxString(v)}"`).join(', ')}}`;
 }
 
-async function queryEstoquePorProduto(produtoId) {
-  if (config.MOCK_MODE) return mock.mockEstoquePorProduto(produtoId);
+/**
+ * Consulta o balancete (debito/credito/saldo por empresa+conta) no periodo e
+ * escopo informados. `empresas` deve ser sempre a lista ja restrita as
+ * empresas autorizadas para a API key da requisicao (ver apiKeyAuth.js) —
+ * nunca uma lista vinda direto do usuario sem checagem.
+ */
+async function queryBalancete({ empresas, periodos, conta, centroCusto }) {
+  if (config.MOCK_MODE) {
+    return mock.mockBalancete({
+      empresas,
+      periodoInicio: periodos.inicio,
+      periodoFim: periodos.fim,
+      conta,
+      centroCusto,
+    });
+  }
 
-  const id = Number(produtoId);
+  const condicoes = [
+    `LANCAMENTOS[EMPRESA] IN ${daxStringSet(empresas)}`,
+    `LANCAMENTOS[PERIODO] IN ${daxStringSet(periodos.lista)}`,
+  ];
+  if (conta !== undefined) {
+    condicoes.push(`LANCAMENTOS[CONTA] = "${escapeDaxString(conta)}"`);
+  }
+  if (centroCusto !== undefined) {
+    condicoes.push(`LANCAMENTOS[CENTRO_CUSTO] = ${centroCusto}`);
+  }
+
   const dax = `
+DEFINE
+    MEASURE LANCAMENTOS[Total Debito] =
+        CALCULATE(SUM(LANCAMENTOS[VALOR]), LANCAMENTOS[NATUREZA] = "D")
+    MEASURE LANCAMENTOS[Total Credito] =
+        CALCULATE(SUM(LANCAMENTOS[VALOR]), LANCAMENTOS[NATUREZA] = "C")
+    MEASURE LANCAMENTOS[Saldo] = [Total Debito] - [Total Credito]
 EVALUATE
 SUMMARIZECOLUMNS(
-    Produtos[Nome],
-    Produtos[Categoria],
-    Estoque[Deposito],
-    FILTER(Produtos, Produtos[ProdutoID] = ${id}),
-    "Quantidade", [Estoque Total]
-)`.trim();
-
-  const rows = await executeDaxQuery(dax);
-  return rows.map((row) => mapRow(row, ESTOQUE_MAPPING));
-}
-
-async function queryVendas(dataInicio, dataFim) {
-  if (config.MOCK_MODE) return mock.mockVendas(dataInicio, dataFim);
-
-  const [anoI, mesI, diaI] = dataInicio.split('-');
-  const [anoF, mesF, diaF] = dataFim.split('-');
-  const dax = `
-EVALUATE
-SUMMARIZECOLUMNS(
-    Produtos[Nome],
-    Produtos[Categoria],
+    LANCAMENTOS[EMPRESA],
+    LANCAMENTOS[CONTA],
+    LANCAMENTOS[DESCRICAO_CONTA],
     FILTER(
-        Vendas,
-        Vendas[DataVenda] >= DATE(${anoI}, ${mesI}, ${diaI}) &&
-        Vendas[DataVenda] <= DATE(${anoF}, ${mesF}, ${diaF})
+        LANCAMENTOS,
+        ${condicoes.join(' &&\n        ')}
     ),
-    "ValorTotal", [Vendas Total (R$)],
-    "Quantidade", [Vendas Qtd]
+    "Debito", [Total Debito],
+    "Credito", [Total Credito],
+    "Saldo", [Saldo]
 )`.trim();
 
   const rows = await executeDaxQuery(dax);
-  return rows.map((row) => mapRow(row, VENDAS_MAPPING));
+  return rows.map((row) => mapRow(row, BALANCETE_MAPPING));
 }
 
-module.exports = { queryEstoqueGeral, queryEstoquePorProduto, queryVendas, PowerBIError };
+module.exports = { queryBalancete, PowerBIError };

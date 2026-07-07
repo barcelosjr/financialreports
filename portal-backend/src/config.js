@@ -27,6 +27,7 @@ function loadConfig() {
     CACHE_TTL_SECONDS: Number(process.env.CACHE_TTL_SECONDS) || 600,
     PORT: Number(process.env.PORT) || 3000,
     MOCK_MODE,
+    CLIENTS_CONFIG_PATH: process.env.CLIENTS_CONFIG_PATH || './clients.json',
   };
 }
 

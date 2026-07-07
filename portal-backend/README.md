@@ -3,7 +3,11 @@
 Backend Node.js/Express que atua como intermediário entre um modelo semântico do
 Power BI (Premium, alimentado por um ERP em SQL Server via *Import* com refresh
 agendado) e o frontend do site. O site nunca fala diretamente com o Power BI
-ou com o ERP — apenas com esta API.
+ou com o ERP — apenas com esta API, autenticado por API key.
+
+O modelo semântico expõe lançamentos contábeis (tabela `LANCAMENTOS`), e a API
+atende **múltiplos clientes/empresas** ao mesmo tempo: cada API key só enxerga
+os dados das empresas autorizadas para ela.
 
 ```
 ERP (SQL Server) → Views → Gateway on-premises → Power BI (Import)
@@ -12,35 +16,40 @@ ERP (SQL Server) → Views → Gateway on-premises → Power BI (Import)
                                           portal-backend (este projeto)
                                                          │
                                                          ▼
-                                                  Frontend do site
+                                    Frontend do site (por cliente, via API key)
 ```
 
 ## Como funciona
 
-1. **Autenticação** ([src/auth.js](src/auth.js)): obtém um token do Azure AD
-   (Entra ID) via *Client Credentials Flow* usando um Service Principal, e
-   mantém o token em cache até ~1 minuto antes de expirar.
-2. **Consulta ao Power BI** ([src/powerbi.js](src/powerbi.js)): monta queries
-   DAX e as envia para o endpoint REST `executeQueries` do dataset
-   configurado, convertendo as linhas retornadas (formato `Tabela[Coluna]`)
-   para JSON "limpo".
-3. **Cache de resultados** ([src/cache.js](src/cache.js)): cada rota mantém
-   seu próprio cache com TTL configurável, evitando bater no Power BI a cada
-   requisição do site.
-4. **Rotas REST** ([src/routes/](src/routes/)): expõem `/api/estoque`,
-   `/api/estoque/:produtoId` e `/api/vendas` para o frontend consumir.
+1. **Autenticação com o Power BI** ([src/auth.js](src/auth.js)): obtém um token
+   do Azure AD (Entra ID) via *Client Credentials Flow* usando um Service
+   Principal, mantido em cache até ~1 minuto antes de expirar.
+2. **Autenticação multi-tenant do frontend** ([src/apiKeyAuth.js](src/apiKeyAuth.js),
+   [src/clients.js](src/clients.js)): cada requisição precisa do header
+   `X-API-KEY`, que é resolvido para um cliente e a lista de `EMPRESA`
+   autorizadas para ele — nenhuma rota pode retornar dados de uma empresa fora
+   dessa lista.
+3. **Consulta ao Power BI** ([src/powerbi.js](src/powerbi.js)): monta queries
+   DAX (com medidas definidas inline via `DEFINE MEASURE`, sem precisar alterar
+   o modelo publicado) e as envia para o endpoint REST `executeQueries` do
+   dataset configurado, convertendo as linhas retornadas (formato
+   `Tabela[Coluna]`) para JSON "limpo".
+4. **Cache de resultados** ([src/cache.js](src/cache.js)): cada rota mantém
+   seu próprio cache com TTL configurável, com chave por empresas + período +
+   filtros, evitando bater no Power BI a cada requisição do site e evitando
+   vazamento de cache entre clientes diferentes.
+5. **Rota REST** ([src/routes/contabil.js](src/routes/contabil.js)): expõe
+   `/api/contabil/balancete` e `/api/contabil/balancete/:conta` para o
+   frontend consumir.
 
 ## Rodando localmente
 
 ### Opção 1 — sem credenciais reais (modo mock)
 
-Como ainda não há um modelo semântico publicado, o backend pode rodar com
-dados fictícios (ver seção "Dados de referência" abaixo), sem precisar de um
-App Registration no Azure nem de um workspace/dataset reais:
-
 ```bash
 npm install
 cp .env.example .env
+cp clients.example.json clients.json
 # no .env, defina apenas:
 #   MOCK_MODE=true
 #   PORT=3000
@@ -48,20 +57,23 @@ npm run dev
 ```
 
 Com `MOCK_MODE=true`, `TENANT_ID`, `CLIENT_ID`, `CLIENT_SECRET`, `GROUP_ID` e
-`DATASET_ID` deixam de ser obrigatórios — nenhuma chamada real ao Azure AD ou
-ao Power BI é feita.
+`DATASET_ID` deixam de ser obrigatórios — os dados vêm de
+[src/mockData.js](src/mockData.js) em vez do Power BI real. `clients.json`
+continua sendo necessário (é a lista de API keys/empresas autorizadas).
 
 ### Opção 2 — com o Power BI real
 
 ```bash
 npm install
 cp .env.example .env
-# preencha TENANT_ID, CLIENT_ID, CLIENT_SECRET, GROUP_ID, DATASET_ID
+cp clients.example.json clients.json
+# preencha TENANT_ID, CLIENT_ID, CLIENT_SECRET, GROUP_ID, DATASET_ID no .env
+# preencha clients.json com as API keys e empresas reais de cada cliente
 npm start
 ```
 
-A aplicação valida as variáveis obrigatórias no boot e falha rápido (com uma
-mensagem clara) se alguma estiver faltando.
+A aplicação valida as variáveis obrigatórias e o `clients.json` no boot e falha
+rápido (com uma mensagem clara) se algo estiver faltando ou malformado.
 
 ## Configurando o Service Principal no Azure
 
@@ -83,53 +95,74 @@ mensagem clara) se alguma estiver faltando.
    do dataset — ambos aparecem na URL do Power BI Service ao abrir o
    workspace/dataset (`app.powerbi.com/groups/<GROUP_ID>/datasets/<DATASET_ID>`).
 
-## Dados de referência (modo mock)
+## Modelo semântico (tabela `LANCAMENTOS`)
 
-Usados em [src/mockData.js](src/mockData.js) para simular o modelo semântico
-enquanto ele não está publicado:
+| Coluna | Uso |
+|---|---|
+| `CONTA` | código da conta contábil |
+| `DESCRICAO_CONTA` | descrição da conta |
+| `CENTRO_CUSTO` | código do centro de custo (numérico) |
+| `DESCRICAO_CC` | descrição do centro de custo |
+| `EMPRESA` | empresa/filial — chave de isolamento multi-tenant |
+| `NATUREZA` | `"D"` (débito) ou `"C"` (crédito) |
+| `VALOR` | valor do lançamento |
+| `PERIODO` | período contábil, formato `"MM/YYYY"` (ex: `"07/2026"`) |
 
-**Produtos** (dimensão): Parafuso M6 (Ferragem), Chapa Aço 2mm (Metalurgia),
-Tinta Epóxi 5L (Pintura).
+Não é necessário criar medidas no modelo: `powerbi.js` define `Total Debito`,
+`Total Credito` e `Saldo` diretamente na query DAX via `DEFINE MEASURE`.
 
-**Estoque** (fato): quantidade disponível por produto/depósito.
+> **Atenção**: `Saldo` é calculado como `Total Debito − Total Credito`
+> (convenção contábil padrão). Dependendo de como o plano de contas classifica
+> natureza devedora/credora por tipo de conta, o sinal pode precisar ser
+> invertido para contas de receita/passivo — valide comparando com um
+> relatório real do Power BI antes de usar em produção.
 
-**Vendas** (fato): vendas por produto, com quantidade, valor total e data.
+## Multi-tenant (`clients.json`)
 
-Medidas DAX equivalentes no modelo real:
+Arquivo (não commitado — copie de `clients.example.json`) com a lista de
+clientes e suas empresas autorizadas:
 
-```dax
-Estoque Total = SUM(Estoque[QuantidadeDisponivel])
-Vendas Total (R$) = SUM(Vendas[ValorTotal])
-Vendas Qtd = SUM(Vendas[Quantidade])
+```json
+[
+  { "apiKey": "chave-aleatoria-longa-do-cliente", "cliente": "Grupo Econômico X", "empresas": ["001", "002"] }
+]
 ```
+
+- O frontend de cada cliente deve enviar o header `X-API-KEY` com a chave
+  correspondente em toda requisição.
+- Sem `?empresa=` na query, a resposta é consolidada para **todas** as
+  empresas autorizadas daquela API key (útil para grupos econômicos com mais
+  de uma empresa).
+- Com `?empresa=X`, a resposta é restrita a essa empresa — mas só se `X`
+  estiver na lista autorizada da API key (senão `403`).
+- Gere `apiKey` com algo como `openssl rand -hex 32` — nunca reutilize chaves
+  entre clientes diferentes.
 
 ## Endpoints
 
-### `GET /api/estoque`
+### `GET /api/contabil/balancete?periodoInicio=YYYY-MM&periodoFim=YYYY-MM&empresa=&centroCusto=`
 
-Estoque agregado por produto/depósito.
-
-```json
-[
-  { "produto": "Parafuso M6", "categoria": "Ferragem", "deposito": "CD-SP", "quantidade": 15000 }
-]
-```
-
-### `GET /api/estoque/:produtoId`
-
-Mesmo formato, filtrado por produto. Retorna `400` se `produtoId` não for um
-inteiro.
-
-### `GET /api/vendas?dataInicio=YYYY-MM-DD&dataFim=YYYY-MM-DD`
-
-Vendas agregadas por produto no período. Retorna `400` se as datas estiverem
-ausentes, com formato inválido, ou se `dataInicio` for posterior a `dataFim`.
+Balancete agregado por empresa/conta no período. `periodoInicio`/`periodoFim`
+são obrigatórios; `empresa` e `centroCusto` são opcionais.
 
 ```json
 [
-  { "produto": "Tinta Epóxi 5L", "categoria": "Pintura", "valorTotal": 420, "quantidade": 2 }
+  { "empresa": "001", "conta": "3.1.01.001", "descricaoConta": "Receita de Vendas", "debito": 1250, "credito": 45000, "saldo": -43750 }
 ]
 ```
+
+### `GET /api/contabil/balancete/:conta?periodoInicio=&periodoFim=&empresa=&centroCusto=`
+
+Mesmo formato, filtrado por uma conta específica.
+
+### `GET /health`
+
+Health check simples (`{ "status": "ok" }`), sem exigir API key — usado pelo
+Nginx/monitoramento.
+
+Erros de validação retornam `400` (período ausente/inválido, `centroCusto` não
+numérico) ou `403` (empresa fora da lista autorizada), com mensagem
+específica do que está errado.
 
 ## Estratégia de cache
 
@@ -138,15 +171,14 @@ Duas camadas, com interfaces independentes:
 - **Token Azure AD** ([src/auth.js](src/auth.js)): reaproveitado até
   ~1 minuto antes de expirar (baseado no `expires_in` retornado pelo AD).
 - **Resultados das queries DAX** ([src/cache.js](src/cache.js)): TTL
-  configurável via `CACHE_TTL_SECONDS`, com chave por endpoint + parâmetros
-  (`estoque-geral`, `estoque-3`, `vendas-2026-06-01_2026-06-30`).
+  configurável via `CACHE_TTL_SECONDS`, com chave por empresas autorizadas +
+  período + conta/centro de custo (nunca compartilhada entre clientes
+  diferentes).
 
-TTLs recomendados, de acordo com a frequência de refresh do Power BI:
-
-| Dado | Refresh no Power BI | TTL sugerido | Implementação |
-|---|---|---|---|
-| Estoque | a cada 1h | 10–15 min | `CACHE_TTL_SECONDS` (padrão 600s = 10 min) |
-| Vendas | 2x/dia | 1–2h | `CACHE_TTL_SECONDS × 6` (padrão 3600s = 1h) |
+Lançamentos contábeis costumam mudar com bem menos frequência que dados
+operacionais — recomendação de `CACHE_TTL_SECONDS` entre `1800` (30 min) e
+`3600` (1h) em produção, ajustável conforme a frequência real de refresh do
+dataset no Power BI.
 
 O cache é abstraído em [src/cache.js](src/cache.js) por uma factory
 (`createCache`) com interface `get` / `set` / `getStale` / `withCache`.
@@ -165,12 +197,17 @@ a resposta HTTP inclui o header `X-Cache-Stale: true` nesse caso.
 
 ## Segurança
 
-- `CLIENT_SECRET` e o token de acesso nunca são logados nem incluídos em
-  respostas de erro.
+- `CLIENT_SECRET`, o token de acesso ao Power BI e as `apiKey` dos clientes
+  nunca são logados nem incluídos em respostas de erro.
 - Erros da API do Power BI são logados no servidor com detalhe; o frontend
-  recebe apenas uma mensagem genérica (`{ "error": "..." }"`).
+  recebe apenas uma mensagem genérica (`{ "error": "..." }`).
 - `429` (throttling) da API do Power BI é tratado com a estratégia
   stale-while-revalidate descrita acima.
+- Valores de `conta`/`centroCusto` vindos de query params são escapados
+  ([src/utils.js](src/utils.js), `escapeDaxString`) antes de entrar na query
+  DAX, para evitar DAX injection.
+- Toda rota contábil exige `X-API-KEY` válido e nunca retorna dados de uma
+  `EMPRESA` fora da lista autorizada para a chave usada.
 
 ## Tratamento de erros
 
@@ -180,16 +217,52 @@ a resposta HTTP inclui o header `X-Cache-Stale: true` nesse caso.
 | Power BI API fora do ar / timeout | `503` com mensagem amigável |
 | Power BI API com throttling (429) | Retorna valor stale do cache se existir; senão `503` |
 | Query DAX mal formada / erro inesperado da API | Log completo no servidor, `500` genérico ao cliente |
-| Parâmetro inválido do usuário (ex: data malformada) | `400` com mensagem específica |
+| Parâmetro inválido do usuário (ex: período malformado) | `400` com mensagem específica |
+| API key ausente/inválida | `401` |
+| Empresa fora da lista autorizada da API key | `403` |
+
+## Deploy no Hostinger (VPS + PM2 + Nginx)
+
+1. **No VPS**, clone o repositório e instale as dependências de produção:
+
+   ```bash
+   git clone <url-do-repo>
+   cd financialreports/portal-backend
+   npm ci --omit=dev
+   cp .env.example .env      # preencha com as credenciais reais
+   cp clients.example.json clients.json   # preencha com as API keys reais
+   ```
+
+2. **PM2** (mantém o processo rodando e reinicia sozinho):
+
+   ```bash
+   npm install -g pm2
+   pm2 start deploy/ecosystem.config.js
+   pm2 save
+   pm2 startup      # siga a instrução impressa para o PM2 iniciar no boot do VPS
+   ```
+
+3. **Nginx** como reverse proxy do domínio para a porta 3000 (só o Nginx fica
+   exposto publicamente): use [deploy/nginx.conf.example](deploy/nginx.conf.example)
+   como base, ajuste o domínio e rode `certbot --nginx` para emitir o
+   certificado HTTPS via Let's Encrypt.
+
+4. **Firewall**: libere apenas `80`/`443` publicamente (`ufw allow 80,443/tcp`);
+   a porta `3000` do Node não precisa (e não deve) ficar acessível de fora do
+   próprio servidor.
+
+5. **Atualizações**: `git pull`, `npm ci --omit=dev`, `pm2 reload portal-backend`.
 
 ## Próximos passos (fora do escopo atual)
 
 - Migrar o cache de `node-cache` para Redis, se o backend passar a rodar em
   múltiplas instâncias/containers (a interface em `cache.js` já foi desenhada
   para isso).
-- Endpoint de health check (`/health`).
-- Testes automatizados (unitários para `auth.js`/`cache.js`, integração para
-  as rotas com mock da API do Power BI).
+- Testes automatizados (unitários para `auth.js`/`cache.js`/`apiKeyAuth.js`,
+  integração para as rotas com mock da API do Power BI).
 - Documentação OpenAPI/Swagger.
+- Endpoint de lançamentos detalhados (extrato linha a linha), hoje fora de
+  escopo — o modelo já tem `HISTORICO_PADRAO` e `REVENDA` disponíveis para
+  isso quando for necessário.
 - Alternativa via XMLA Endpoint (Premium) se os volumes ultrapassarem os
   limites do `executeQueries` (~100k linhas / 1GB por chamada).
