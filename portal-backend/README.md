@@ -75,6 +75,20 @@ npm start
 A aplicação valida as variáveis obrigatórias e o `clients.json` no boot e falha
 rápido (com uma mensagem clara) se algo estiver faltando ou malformado.
 
+## Frontend de demonstração
+
+O app serve uma página estática simples em [public/index.html](public/index.html)
+na raiz (`/`), via `express.static` — não precisa de build nem de servidor
+separado. Ela mostra o **saldo total** de um período: o usuário informa a
+`API Key`, o período em formato `MM/AAAA` (convertido para `YYYY-MM` no
+próprio JavaScript da página antes de chamar a API) e consulta
+`GET /api/contabil/balancete/total`.
+
+É só um ponto de partida para integrar com o site de verdade — quando o
+frontend definitivo tiver seu próprio domínio, configure `CORS_ORIGIN` (ver
+seção "CORS") e aponte o `fetch` para a URL pública desta API em vez de usar
+caminho relativo.
+
 ## Rodando os testes
 
 ```bash
@@ -173,6 +187,16 @@ são obrigatórios; `empresa` e `centroCusto` são opcionais.
 ### `GET /api/contabil/balancete/:conta?periodoInicio=&periodoFim=&empresa=&centroCusto=`
 
 Mesmo formato, filtrado por uma conta específica.
+
+### `GET /api/contabil/balancete/total?periodoInicio=YYYY-MM&periodoFim=YYYY-MM&empresa=&centroCusto=`
+
+Soma o `saldo` (Débito − Crédito) de todas as linhas do período/escopo — mesmos
+filtros e mesmo cache do balancete completo, só que devolve um único número em
+vez do array por conta:
+
+```json
+{ "saldo": -47450 }
+```
 
 ### `GET /health`
 

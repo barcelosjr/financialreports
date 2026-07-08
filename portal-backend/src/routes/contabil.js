@@ -66,6 +66,25 @@ function cacheKey({ empresas, periodoInicio, periodoFim, conta, centroCusto }) {
   return `balancete-${empresasKey}-${periodoInicio}_${periodoFim}-${conta || 'geral'}-${centroCusto ?? ''}`;
 }
 
+// Precisa vir antes de "/:conta" para nao ser interpretado como uma conta
+// chamada "total".
+router.get('/total', async (req, res) => {
+  const filtros = parseFiltrosComuns(req, res);
+  if (!filtros) return;
+
+  try {
+    const key = cacheKey(filtros);
+    const { data, stale } = await cache.withCache(key, () =>
+      queryBalancete({ empresas: filtros.empresas, periodos: filtros.periodos, centroCusto: filtros.centroCusto })
+    );
+    const saldo = data.reduce((acc, linha) => acc + linha.saldo, 0);
+    if (stale) res.set('X-Cache-Stale', 'true');
+    res.json({ saldo });
+  } catch (err) {
+    handlePowerBIError(err, res, 'Falha ao consultar saldo total.');
+  }
+});
+
 router.get('/:conta', async (req, res) => {
   const { conta } = req.params;
   const filtros = parseFiltrosComuns(req, res);

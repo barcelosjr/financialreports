@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<title>Saldo total — portal-backend</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: system-ui, sans-serif;
+    max-width: 480px;
+    margin: 3rem auto;
+    padding: 0 1rem;
+    color: #1a1a1a;
+    background: #fff;
+  }
+  h1 { font-size: 1.25rem; margin-bottom: 1.5rem; }
+  label { display: block; font-size: 0.85rem; margin-top: 0.75rem; margin-bottom: 0.25rem; color: #444; }
+  input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    color: #1a1a1a;
+    background: #fff;
+  }
+  button { margin-top: 1.25rem; padding: 0.6rem 1.2rem; font-size: 1rem; border: none; border-radius: 4px; background: #1a56db; color: #fff; cursor: pointer; }
+  button:disabled { background: #9ab0e0; cursor: default; }
+  #resultado { margin-top: 1.5rem; padding: 1rem; border-radius: 6px; background: #f3f4f6; color: #1a1a1a; display: none; }
+  #resultado.erro { background: #fde8e8; color: #9b1c1c; }
+  #resultado .valor { font-size: 1.75rem; font-weight: 600; }
+  #resultado .stale { font-size: 0.8rem; color: #92700c; margin-top: 0.25rem; }
+
+  @media (prefers-color-scheme: dark) {
+    body { color: #e5e7eb; background: #111827; }
+    label { color: #9ca3af; }
+    input { color: #e5e7eb; background: #1f2937; border-color: #374151; }
+    #resultado { background: #1f2937; color: #e5e7eb; }
+    #resultado.erro { background: #4c1d1d; color: #fca5a5; }
+    #resultado .stale { color: #facc15; }
+  }
+</style>
+</head>
+<body>
+  <h1>Saldo total do período</h1>
+
+  <form id="form-saldo">
+    <label for="apiKey">API Key</label>
+    <input id="apiKey" type="text" autocomplete="off" required />
+
+    <label for="periodoInicio">Período início (MM/AAAA)</label>
+    <input id="periodoInicio" type="text" placeholder="07/2026" pattern="\d{2}/\d{4}" required />
+
+    <label for="periodoFim">Período fim (MM/AAAA)</label>
+    <input id="periodoFim" type="text" placeholder="08/2026" pattern="\d{2}/\d{4}" required />
+
+    <button type="submit">Consultar</button>
+  </form>
+
+  <div id="resultado"></div>
+
+  <script>
+    const form = document.getElementById('form-saldo');
+    const resultado = document.getElementById('resultado');
+
+    function mmAaaaParaIso(valor) {
+      const [mes, ano] = valor.split('/');
+      return `${ano}-${mes}`;
+    }
+
+    function formatarMoeda(valor) {
+      return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function mostrarErro(mensagem) {
+      resultado.className = 'erro';
+      resultado.style.display = 'block';
+      resultado.textContent = mensagem;
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const apiKey = document.getElementById('apiKey').value.trim();
+      const periodoInicio = document.getElementById('periodoInicio').value.trim();
+      const periodoFim = document.getElementById('periodoFim').value.trim();
+
+      if (!/^\d{2}\/\d{4}$/.test(periodoInicio) || !/^\d{2}\/\d{4}$/.test(periodoFim)) {
+        mostrarErro('Informe o período no formato MM/AAAA.');
+        return;
+      }
+
+      const params = new URLSearchParams({
+        periodoInicio: mmAaaaParaIso(periodoInicio),
+        periodoFim: mmAaaaParaIso(periodoFim),
+      });
+
+      const button = form.querySelector('button');
+      button.disabled = true;
+      resultado.style.display = 'none';
+
+      try {
+        const res = await fetch(`/api/contabil/balancete/total?${params}`, {
+          headers: { 'X-API-KEY': apiKey },
+        });
+        const dados = await res.json();
+
+        if (!res.ok) {
+          mostrarErro(dados.error || `Erro ${res.status} ao consultar o saldo.`);
+          return;
+        }
+
+        resultado.className = '';
+        resultado.style.display = 'block';
+        resultado.innerHTML = `
+          <div class="valor">${formatarMoeda(dados.saldo)}</div>
+          ${res.headers.get('x-cache-stale') === 'true' ? '<div class="stale">Dado em cache (stale) — Power BI temporariamente indisponível.</div>' : ''}
+        `;
+      } catch (err) {
+        mostrarErro('Falha ao conectar com a API.');
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

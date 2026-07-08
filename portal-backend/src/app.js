@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 
@@ -43,6 +44,8 @@ function createApp() {
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
   });
+
+  app.use(express.static(path.join(__dirname, '..', 'public')));
 
   app.use('/api/contabil/balancete', apiKeyAuth, contabilRouter);
 

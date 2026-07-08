@@ -98,3 +98,31 @@ test('header X-Cache-Stale ausente em resposta fresca', async () => {
     .set('X-API-KEY', API_KEY);
   expect(res.headers['x-cache-stale']).toBeUndefined();
 });
+
+describe('GET /api/contabil/balancete/total', () => {
+  test('sem periodoInicio/periodoFim retorna 400', async () => {
+    const res = await request(app)
+      .get('/api/contabil/balancete/total')
+      .set('X-API-KEY', API_KEY);
+    expect(res.status).toBe(400);
+  });
+
+  test('retorna a soma do saldo (debito - credito) do periodo', async () => {
+    const res = await request(app)
+      .get('/api/contabil/balancete/total?periodoInicio=2026-01&periodoFim=2026-12')
+      .set('X-API-KEY', API_KEY);
+
+    expect(res.status).toBe(200);
+    // 001/3.1.01.001: -43750, 001/4.1.02.010: 8300, 002/3.1.01.001: -12000
+    expect(res.body).toEqual({ saldo: -43750 + 8300 - 12000 });
+  });
+
+  test('respeita o filtro ?empresa=', async () => {
+    const res = await request(app)
+      .get('/api/contabil/balancete/total?periodoInicio=2026-01&periodoFim=2026-12&empresa=002')
+      .set('X-API-KEY', API_KEY);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ saldo: -12000 });
+  });
+});
