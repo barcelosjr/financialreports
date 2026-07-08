@@ -52,22 +52,30 @@ async function executeDaxQuery(daxQuery, { retry = true } = {}) {
   }
 }
 
-function mapRow(row, mapping) {
-  const out = {};
-  for (const [rawKey, friendlyKey] of Object.entries(mapping)) {
-    out[friendlyKey] = row[rawKey];
-  }
-  return out;
+/**
+ * O Power BI devolve colunas de tabela com a chave "NomeRealDaTabela[Coluna]",
+ * preservando o case exato definido no modelo — que pode nao bater com o
+ * "LANCAMENTOS" (maiusculo) usado na query DAX, ja que DAX resolve nomes de
+ * tabela sem diferenciar maiusculas/minusculas. Por isso a busca aqui e por
+ * sufixo "[Coluna]" (tambem case-insensitive), em vez de exigir o prefixo
+ * exato da tabela.
+ */
+function getColumnValue(row, columnName) {
+  const suffix = `[${columnName}]`.toLowerCase();
+  const key = Object.keys(row).find((k) => k.toLowerCase().endsWith(suffix));
+  return key === undefined ? undefined : row[key];
 }
 
-const BALANCETE_MAPPING = {
-  'LANCAMENTOS[EMPRESA]': 'empresa',
-  'LANCAMENTOS[CONTA]': 'conta',
-  'LANCAMENTOS[DESCRICAO_CONTA]': 'descricaoConta',
-  '[Debito]': 'debito',
-  '[Credito]': 'credito',
-  '[Saldo]': 'saldo',
-};
+function mapRow(row) {
+  return {
+    empresa: getColumnValue(row, 'EMPRESA'),
+    conta: getColumnValue(row, 'CONTA'),
+    descricaoConta: getColumnValue(row, 'DESCRICAO_CONTA'),
+    debito: getColumnValue(row, 'Debito'),
+    credito: getColumnValue(row, 'Credito'),
+    saldo: getColumnValue(row, 'Saldo'),
+  };
+}
 
 function daxStringSet(values) {
   return `{${values.map((v) => `"${escapeDaxString(v)}"`).join(', ')}}`;
@@ -123,7 +131,7 @@ SUMMARIZECOLUMNS(
 )`.trim();
 
   const rows = await executeDaxQuery(dax);
-  return rows.map((row) => mapRow(row, BALANCETE_MAPPING));
+  return rows.map((row) => mapRow(row));
 }
 
 module.exports = { queryBalancete, PowerBIError };
