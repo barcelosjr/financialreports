@@ -75,6 +75,25 @@ npm start
 A aplicação valida as variáveis obrigatórias e o `clients.json` no boot e falha
 rápido (com uma mensagem clara) se algo estiver faltando ou malformado.
 
+## Rodando os testes
+
+```bash
+npm test              # unitarios + integracao
+npm run test:coverage # idem, com relatorio de cobertura em coverage/
+```
+
+Os testes (Jest + Supertest) sempre rodam com `MOCK_MODE=true` e uma fixture
+própria de clientes ([tests/fixtures/clients.test.json](tests/fixtures/clients.test.json)),
+configurada em [tests/setup-env.js](tests/setup-env.js) — nunca leem
+credenciais reais nem o `clients.json` do usuário.
+
+- `tests/unit/`: `cache.js`, `auth.js` (com `axios` mockado), `clients.js`,
+  `apiKeyAuth.js`, `periodo.js` e `utils.js`, isolados de rede/disco reais.
+- `tests/integration/`: exercitam o app Express completo via
+  [src/app.js](src/app.js) (que expõe `createApp()` sem abrir porta) usando
+  Supertest — rotas `/health`, `/api/contabil/balancete` (incluindo os casos
+  de erro 400/401/403) e o comportamento de CORS.
+
 ## Configurando o Service Principal no Azure
 
 1. **App Registration**: no Azure Portal, crie um *App registration* em
@@ -209,6 +228,19 @@ a resposta HTTP inclui o header `X-Cache-Stale: true` nesse caso.
 - Toda rota contábil exige `X-API-KEY` válido e nunca retorna dados de uma
   `EMPRESA` fora da lista autorizada para a chave usada.
 
+## CORS
+
+O domínio do site que vai consumir esta API é configurado via `CORS_ORIGIN`
+no `.env` ([src/app.js](src/app.js)):
+
+- Vazio (padrão): CORS fica **desabilitado** — use enquanto o domínio do
+  frontend ainda não estiver definido, ou quando backend e frontend forem
+  servidos pela mesma origem.
+- Uma origem única: `CORS_ORIGIN=https://portal.suaempresa.com.br`.
+- Múltiplas origens, separadas por vírgula:
+  `CORS_ORIGIN=https://portal.suaempresa.com.br,https://www.suaempresa.com.br`.
+- `CORS_ORIGIN=*`: libera qualquer origem — usar apenas em desenvolvimento.
+
 ## Tratamento de erros
 
 | Situação | Comportamento |
@@ -258,8 +290,6 @@ a resposta HTTP inclui o header `X-Cache-Stale: true` nesse caso.
 - Migrar o cache de `node-cache` para Redis, se o backend passar a rodar em
   múltiplas instâncias/containers (a interface em `cache.js` já foi desenhada
   para isso).
-- Testes automatizados (unitários para `auth.js`/`cache.js`/`apiKeyAuth.js`,
-  integração para as rotas com mock da API do Power BI).
 - Documentação OpenAPI/Swagger.
 - Endpoint de lançamentos detalhados (extrato linha a linha), hoje fora de
   escopo — o modelo já tem `HISTORICO_PADRAO` e `REVENDA` disponíveis para

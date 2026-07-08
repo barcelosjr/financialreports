@@ -1,0 +1,7 @@
+[
+  {
+    "apiKey": "test-api-key-empresa-001",
+    "cliente": "Cliente Teste",
+    "empresas": ["001", "002"]
+  }
+]
