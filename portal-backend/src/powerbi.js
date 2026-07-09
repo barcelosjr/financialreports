@@ -134,4 +134,31 @@ SUMMARIZECOLUMNS(
   return rows.map((row) => mapRow(row));
 }
 
-module.exports = { queryBalancete, PowerBIError };
+/**
+ * Lista as contas unicas (codigo + descricao) usadas por uma empresa, para a
+ * pagina de configuracao de relatorios classificar cada uma (DRE/Balanco/
+ * Fluxo de Caixa). Nao filtra por periodo — traz o historico completo de
+ * contas ja usadas pela empresa.
+ */
+async function queryContasUnicas({ empresa }) {
+  if (config.MOCK_MODE) {
+    return mock.mockContasUnicas({ empresa });
+  }
+
+  const dax = `
+EVALUATE
+SUMMARIZECOLUMNS(
+    LANCAMENTOS[CONTA],
+    LANCAMENTOS[DESCRICAO_CONTA],
+    FILTER(LANCAMENTOS, LANCAMENTOS[EMPRESA] = "${escapeDaxString(empresa)}")
+)
+ORDER BY LANCAMENTOS[CONTA]`.trim();
+
+  const rows = await executeDaxQuery(dax);
+  return rows.map((row) => ({
+    conta: getColumnValue(row, 'CONTA'),
+    descricaoConta: getColumnValue(row, 'DESCRICAO_CONTA'),
+  }));
+}
+
+module.exports = { queryBalancete, queryContasUnicas, PowerBIError };

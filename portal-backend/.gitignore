@@ -1,6 +1,7 @@
 node_modules/
 .env
 clients.json
+classificacoes.json
 logs/
 npm-debug.log*
 *.log

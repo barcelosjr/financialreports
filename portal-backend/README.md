@@ -41,6 +41,12 @@ ERP (SQL Server) → Views → Gateway on-premises → Power BI (Import)
 5. **Rota REST** ([src/routes/contabil.js](src/routes/contabil.js)): expõe
    `/api/contabil/balancete` e `/api/contabil/balancete/:conta` para o
    frontend consumir.
+6. **Classificação de contas** ([src/classificacoes.js](src/classificacoes.js),
+   [src/routes/contas.js](src/routes/contas.js)): cada conta contábil pode ser
+   marcada manualmente (por empresa) para DRE, Balanço e/ou Fluxo de Caixa —
+   uma conta pode pertencer a mais de um relatório ao mesmo tempo. Persistido
+   em um arquivo JSON simples (mesmo padrão do `clients.json`), sem banco de
+   dados.
 
 ## Rodando localmente
 
@@ -88,6 +94,13 @@ próprio JavaScript da página antes de chamar a API) e consulta
 frontend definitivo tiver seu próprio domínio, configure `CORS_ORIGIN` (ver
 seção "CORS") e aponte o `fetch` para a URL pública desta API em vez de usar
 caminho relativo.
+
+Também há [public/relatorios.html](public/relatorios.html) — página de
+administração para classificar cada conta contábil (DRE/Balanço/Fluxo de
+Caixa) por empresa: carrega as empresas autorizadas pela API key, lista as
+contas únicas da empresa selecionada, salva a classificação conta a conta
+(um clique por linha) e permite copiar as classificações de uma empresa para
+outra.
 
 ## Rodando os testes
 
@@ -198,14 +211,52 @@ vez do array por conta:
 { "saldo": -47450 }
 ```
 
+### `GET /api/contabil/empresas`
+
+Lista as empresas autorizadas para a API key usada — usado pela página de
+configuração de relatórios para popular os filtros de empresa:
+
+```json
+{ "empresas": ["KOBE", "ROYAL", "RENAULT"] }
+```
+
+### `GET /api/contabil/contas?empresa=X`
+
+Lista as contas únicas já usadas por uma empresa (todo o histórico, sem
+filtro de período), já mescladas com a classificação salva:
+
+```json
+[
+  { "conta": "11102020002", "descricaoConta": "BANCO BRADESCO GV", "dre": false, "balanco": true, "fluxoCaixa": false }
+]
+```
+
+### `PUT /api/contabil/contas/:conta?empresa=X`
+
+Salva a classificação de uma única conta. Corpo (todos os campos opcionais,
+tratados como `false` se ausentes):
+
+```json
+{ "dre": true, "balanco": false, "fluxoCaixa": true }
+```
+
+### `POST /api/contabil/contas/copiar`
+
+Copia as classificações de uma empresa para outra, sobrescrevendo no destino
+as contas que também existirem na origem:
+
+```json
+{ "empresaOrigem": "KOBE", "empresaDestino": "ROYAL" }
+```
+
 ### `GET /health`
 
 Health check simples (`{ "status": "ok" }`), sem exigir API key — usado pelo
 Nginx/monitoramento.
 
 Erros de validação retornam `400` (período ausente/inválido, `centroCusto` não
-numérico) ou `403` (empresa fora da lista autorizada), com mensagem
-específica do que está errado.
+numérico, `empresa` ausente) ou `403` (empresa fora da lista autorizada), com
+mensagem específica do que está errado.
 
 ## Estratégia de cache
 

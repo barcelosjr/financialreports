@@ -16,6 +16,19 @@ function periodoParaChave(periodo) {
   return `${ano}-${mes}`;
 }
 
+function mockContasUnicas({ empresa }) {
+  const vistos = new Map();
+  for (const linha of LANCAMENTOS) {
+    if (linha.EMPRESA !== empresa) continue;
+    if (!vistos.has(linha.CONTA)) {
+      vistos.set(linha.CONTA, linha.DESCRICAO_CONTA);
+    }
+  }
+  return Array.from(vistos.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([conta, descricaoConta]) => ({ conta, descricaoConta }));
+}
+
 function mockBalancete({ empresas, periodoInicio, periodoFim, conta, centroCusto }) {
   const linhas = LANCAMENTOS.filter((linha) => {
     const chavePeriodo = periodoParaChave(linha.PERIODO);
@@ -49,4 +62,4 @@ function mockBalancete({ empresas, periodoInicio, periodoFim, conta, centroCusto
   }));
 }
 
-module.exports = { mockBalancete };
+module.exports = { mockBalancete, mockContasUnicas };

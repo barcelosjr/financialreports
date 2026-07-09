@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<title>Configuração de Relatórios — portal-backend</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, sans-serif;
+    max-width: 1000px;
+    margin: 2rem auto;
+    padding: 0 1rem 3rem;
+    color: #1a1a1a;
+    background: #fff;
+  }
+  h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+  .subtitulo { font-size: 0.85rem; color: #666; margin-bottom: 1.5rem; }
+  a { color: #1a56db; }
+
+  .painel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: end;
+    padding: 1rem;
+    border-radius: 8px;
+    background: #f3f4f6;
+    margin-bottom: 1rem;
+  }
+  .campo { display: flex; flex-direction: column; gap: 0.25rem; }
+  .campo label { font-size: 0.75rem; color: #555; }
+  input, select {
+    padding: 0.45rem 0.6rem;
+    font-size: 0.9rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    color: #1a1a1a;
+    background: #fff;
+  }
+  button {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    border: none;
+    border-radius: 4px;
+    background: #1a56db;
+    color: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button.secundario { background: #4b5563; }
+  button.linha { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+  button:disabled { background: #9ab0e0; cursor: default; }
+
+  #mensagem { margin: 0.75rem 0; padding: 0.6rem 0.9rem; border-radius: 6px; background: #f3f4f6; display: none; font-size: 0.9rem; }
+  #mensagem.erro { background: #fde8e8; color: #9b1c1c; }
+  #mensagem.sucesso { background: #def7ec; color: #03543f; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  thead th {
+    position: sticky; top: 0;
+    text-align: left;
+    padding: 0.5rem 0.6rem;
+    background: #e5e7eb;
+    border-bottom: 1px solid #d1d5db;
+  }
+  tbody td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #eee; vertical-align: middle; }
+  tbody tr:hover { background: #f9fafb; }
+  .tabela-wrap { max-height: 60vh; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; }
+  .col-check { text-align: center; width: 5.5rem; }
+  .col-check input { width: 1.1rem; height: 1.1rem; cursor: pointer; }
+
+  .pill { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.75rem; }
+  .pill.classificada { background: #def7ec; color: #03543f; }
+  .pill.pendente { background: #eee; color: #666; }
+
+  .rodape-nav { margin-top: 2rem; font-size: 0.85rem; }
+
+  @media (prefers-color-scheme: dark) {
+    body { color: #e5e7eb; background: #111827; }
+    .subtitulo { color: #9ca3af; }
+    .painel { background: #1f2937; }
+    .campo label { color: #9ca3af; }
+    input, select { color: #e5e7eb; background: #1f2937; border-color: #374151; }
+    button.secundario { background: #374151; }
+    thead th { background: #1f2937; border-color: #374151; }
+    tbody td { border-color: #263244; }
+    tbody tr:hover { background: #1a2333; }
+    .tabela-wrap { border-color: #374151; }
+    #mensagem { background: #1f2937; }
+    #mensagem.erro { background: #4c1d1d; color: #fca5a5; }
+    #mensagem.sucesso { background: #04351f; color: #6ee7b7; }
+    .pill.classificada { background: #04351f; color: #6ee7b7; }
+    .pill.pendente { background: #263244; color: #9ca3af; }
+  }
+</style>
+</head>
+<body>
+  <h1>Configuração de Relatórios</h1>
+  <div class="subtitulo">Classifique cada conta contábil para DRE, Balanço e Fluxo de Caixa. Uma conta pode pertencer a mais de um relatório.</div>
+
+  <div class="painel">
+    <div class="campo">
+      <label for="apiKey">API Key</label>
+      <input id="apiKey" type="text" autocomplete="off" style="min-width: 260px;" />
+    </div>
+    <button id="btn-carregar-empresas">Carregar empresas</button>
+  </div>
+
+  <div class="painel">
+    <div class="campo">
+      <label for="empresa">Empresa</label>
+      <select id="empresa" disabled style="min-width: 220px;"><option value="">— carregue as empresas —</option></select>
+    </div>
+    <button id="btn-atualizar" disabled>Atualizar</button>
+    <div class="campo" style="flex: 1; min-width: 200px;">
+      <label for="busca">Buscar conta/descrição</label>
+      <input id="busca" type="text" placeholder="filtrar..." />
+    </div>
+  </div>
+
+  <div class="painel">
+    <div class="campo">
+      <label for="empresaOrigem">Copiar de</label>
+      <select id="empresaOrigem" disabled><option value="">—</option></select>
+    </div>
+    <div class="campo">
+      <label for="empresaDestino">Copiar para</label>
+      <select id="empresaDestino" disabled><option value="">—</option></select>
+    </div>
+    <button id="btn-copiar" class="secundario" disabled>Copiar classificações</button>
+  </div>
+
+  <div id="mensagem"></div>
+
+  <div class="tabela-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Conta</th>
+          <th>Descrição</th>
+          <th class="col-check">DRE</th>
+          <th class="col-check">Balanço</th>
+          <th class="col-check">Fluxo de Caixa</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tabela-corpo">
+        <tr><td colspan="7" style="text-align:center; color:#888; padding: 2rem;">Carregue as empresas e clique em "Atualizar".</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="rodape-nav"><a href="/">← Saldo total do período</a></div>
+
+  <script>
+    const apiKeyInput = document.getElementById('apiKey');
+    const empresaSelect = document.getElementById('empresa');
+    const empresaOrigemSelect = document.getElementById('empresaOrigem');
+    const empresaDestinoSelect = document.getElementById('empresaDestino');
+    const buscaInput = document.getElementById('busca');
+    const tabelaCorpo = document.getElementById('tabela-corpo');
+    const mensagem = document.getElementById('mensagem');
+
+    function apiKey() { return apiKeyInput.value.trim(); }
+
+    function mostrarMensagem(texto, tipo) {
+      mensagem.className = tipo || '';
+      mensagem.style.display = 'block';
+      mensagem.textContent = texto;
+    }
+
+    function limparMensagem() {
+      mensagem.style.display = 'none';
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        ...options,
+        headers: { 'X-API-KEY': apiKey(), 'Content-Type': 'application/json', ...(options.headers || {}) },
+      });
+      const dados = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(dados.error || `Erro ${res.status}`);
+      }
+      return dados;
+    }
+
+    function preencherSelect(select, empresas, comPlaceholder) {
+      select.innerHTML = '';
+      if (comPlaceholder) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '— selecione —';
+        select.appendChild(opt);
+      }
+      for (const emp of empresas) {
+        const opt = document.createElement('option');
+        opt.value = emp;
+        opt.textContent = emp;
+        select.appendChild(opt);
+      }
+      select.disabled = empresas.length === 0;
+    }
+
+    document.getElementById('btn-carregar-empresas').addEventListener('click', async () => {
+      limparMensagem();
+      if (!apiKey()) {
+        mostrarMensagem('Informe a API Key.', 'erro');
+        return;
+      }
+      try {
+        const dados = await api('/api/contabil/empresas');
+        preencherSelect(empresaSelect, dados.empresas, true);
+        preencherSelect(empresaOrigemSelect, dados.empresas, true);
+        preencherSelect(empresaDestinoSelect, dados.empresas, true);
+        document.getElementById('btn-atualizar').disabled = false;
+        document.getElementById('btn-copiar').disabled = false;
+        mostrarMensagem(`${dados.empresas.length} empresa(s) carregada(s).`, 'sucesso');
+      } catch (err) {
+        mostrarMensagem(err.message, 'erro');
+      }
+    });
+
+    function linhaTabela(item, empresa) {
+      const tr = document.createElement('tr');
+      tr.dataset.conta = item.conta.toLowerCase();
+      tr.dataset.descricao = (item.descricaoConta || '').toLowerCase();
+
+      const tdConta = document.createElement('td');
+      tdConta.textContent = item.conta;
+
+      const tdDescricao = document.createElement('td');
+      tdDescricao.textContent = item.descricaoConta || '';
+
+      const criarCheckbox = (campo) => {
+        const td = document.createElement('td');
+        td.className = 'col-check';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = !!item[campo];
+        input.dataset.campo = campo;
+        td.appendChild(input);
+        return { td, input };
+      };
+
+      const dre = criarCheckbox('dre');
+      const balanco = criarCheckbox('balanco');
+      const fluxoCaixa = criarCheckbox('fluxoCaixa');
+
+      const tdStatus = document.createElement('td');
+      const pill = document.createElement('span');
+      function atualizarPill() {
+        const classificada = dre.input.checked || balanco.input.checked || fluxoCaixa.input.checked;
+        pill.className = 'pill ' + (classificada ? 'classificada' : 'pendente');
+        pill.textContent = classificada ? 'Classificada' : 'Pendente';
+      }
+      atualizarPill();
+      [dre.input, balanco.input, fluxoCaixa.input].forEach((input) => input.addEventListener('change', atualizarPill));
+      tdStatus.appendChild(pill);
+
+      const tdAcao = document.createElement('td');
+      const btnSalvar = document.createElement('button');
+      btnSalvar.className = 'linha';
+      btnSalvar.textContent = 'Salvar';
+      btnSalvar.addEventListener('click', async () => {
+        btnSalvar.disabled = true;
+        const textoOriginal = btnSalvar.textContent;
+        try {
+          await api(`/api/contabil/contas/${encodeURIComponent(item.conta)}?empresa=${encodeURIComponent(empresa)}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              dre: dre.input.checked,
+              balanco: balanco.input.checked,
+              fluxoCaixa: fluxoCaixa.input.checked,
+            }),
+          });
+          btnSalvar.textContent = 'Salvo ✓';
+          setTimeout(() => { btnSalvar.textContent = textoOriginal; }, 1500);
+        } catch (err) {
+          mostrarMensagem(`Falha ao salvar a conta ${item.conta}: ${err.message}`, 'erro');
+        } finally {
+          btnSalvar.disabled = false;
+        }
+      });
+      tdAcao.appendChild(btnSalvar);
+
+      tr.append(tdConta, tdDescricao, dre.td, balanco.td, fluxoCaixa.td, tdStatus, tdAcao);
+      return tr;
+    }
+
+    document.getElementById('btn-atualizar').addEventListener('click', async () => {
+      limparMensagem();
+      const empresa = empresaSelect.value;
+      if (!empresa) {
+        mostrarMensagem('Selecione uma empresa.', 'erro');
+        return;
+      }
+      tabelaCorpo.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem;">Carregando...</td></tr>';
+      try {
+        const contas = await api(`/api/contabil/contas?empresa=${encodeURIComponent(empresa)}`);
+        tabelaCorpo.innerHTML = '';
+        if (contas.length === 0) {
+          tabelaCorpo.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem;">Nenhuma conta encontrada para essa empresa.</td></tr>';
+          return;
+        }
+        for (const item of contas) {
+          tabelaCorpo.appendChild(linhaTabela(item, empresa));
+        }
+      } catch (err) {
+        tabelaCorpo.innerHTML = '';
+        mostrarMensagem(err.message, 'erro');
+      }
+    });
+
+    buscaInput.addEventListener('input', () => {
+      const termo = buscaInput.value.trim().toLowerCase();
+      for (const tr of tabelaCorpo.querySelectorAll('tr[data-conta]')) {
+        const bate = !termo || tr.dataset.conta.includes(termo) || tr.dataset.descricao.includes(termo);
+        tr.style.display = bate ? '' : 'none';
+      }
+    });
+
+    const btnCopiar = document.getElementById('btn-copiar');
+    const textoOriginalBtnCopiar = btnCopiar.textContent;
+    let aguardandoConfirmacaoCopia = false;
+    let timeoutConfirmacaoCopia = null;
+
+    function resetarBotaoCopiar() {
+      aguardandoConfirmacaoCopia = false;
+      btnCopiar.textContent = textoOriginalBtnCopiar;
+      clearTimeout(timeoutConfirmacaoCopia);
+    }
+
+    btnCopiar.addEventListener('click', async () => {
+      const empresaOrigem = empresaOrigemSelect.value;
+      const empresaDestino = empresaDestinoSelect.value;
+
+      if (!aguardandoConfirmacaoCopia) {
+        limparMensagem();
+        if (!empresaOrigem || !empresaDestino) {
+          mostrarMensagem('Selecione a empresa de origem e a de destino.', 'erro');
+          return;
+        }
+        if (empresaOrigem === empresaDestino) {
+          mostrarMensagem('Origem e destino devem ser empresas diferentes.', 'erro');
+          return;
+        }
+        mostrarMensagem(
+          `Isso vai sobrescrever, em "${empresaDestino}", a classificação de todas as contas que existirem em "${empresaOrigem}". Clique em "Confirmar cópia" de novo para continuar.`,
+          'erro'
+        );
+        aguardandoConfirmacaoCopia = true;
+        btnCopiar.textContent = 'Confirmar cópia';
+        timeoutConfirmacaoCopia = setTimeout(resetarBotaoCopiar, 5000);
+        return;
+      }
+
+      resetarBotaoCopiar();
+      limparMensagem();
+      try {
+        const resultado = await api('/api/contabil/contas/copiar', {
+          method: 'POST',
+          body: JSON.stringify({ empresaOrigem, empresaDestino }),
+        });
+        mostrarMensagem(`${resultado.contasCopiadas} conta(s) copiada(s) para ${empresaDestino}.`, 'sucesso');
+        if (empresaSelect.value === empresaDestino) {
+          document.getElementById('btn-atualizar').click();
+        }
+      } catch (err) {
+        mostrarMensagem(err.message, 'erro');
+      }
+    });
+  </script>
+</body>
+</html>
