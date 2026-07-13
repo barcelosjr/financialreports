@@ -24,4 +24,23 @@ function escapeDaxString(value) {
   return value.replace(/"/g, '""');
 }
 
-module.exports = { handlePowerBIError, escapeDaxString };
+/**
+ * Le e valida o parametro obrigatorio ?empresa=, restrito as empresas
+ * autorizadas para a API key da requisicao (req.empresasAutorizadas, anexado
+ * por apiKeyAuth.js). Retorna a empresa validada, ou null apos ja ter escrito
+ * a resposta 400/403 em res.
+ */
+function parseEmpresa(req, res) {
+  const { empresa } = req.query;
+  if (!empresa) {
+    res.status(400).json({ error: 'Parâmetro "empresa" é obrigatório.' });
+    return null;
+  }
+  if (!req.empresasAutorizadas.includes(empresa)) {
+    res.status(403).json({ error: 'Empresa informada não está autorizada para esta API key.' });
+    return null;
+  }
+  return empresa;
+}
+
+module.exports = { handlePowerBIError, escapeDaxString, parseEmpresa };

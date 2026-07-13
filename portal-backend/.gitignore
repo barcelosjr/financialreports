@@ -2,6 +2,7 @@ node_modules/
 .env
 clients.json
 classificacoes.json
+estruturas.json
 logs/
 npm-debug.log*
 *.log

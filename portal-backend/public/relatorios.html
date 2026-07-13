@@ -8,7 +8,7 @@
   * { box-sizing: border-box; }
   body {
     font-family: system-ui, sans-serif;
-    max-width: 1000px;
+    max-width: 1100px;
     margin: 2rem auto;
     padding: 0 1rem 3rem;
     color: #1a1a1a;
@@ -49,7 +49,9 @@
     white-space: nowrap;
   }
   button.secundario { background: #4b5563; }
+  button.perigo { background: #9b1c1c; }
   button.linha { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+  button.pequeno { padding: 0.25rem 0.55rem; font-size: 0.75rem; }
   button:disabled { background: #9ab0e0; cursor: default; }
 
   #mensagem { margin: 0.75rem 0; padding: 0.6rem 0.9rem; border-radius: 6px; background: #f3f4f6; display: none; font-size: 0.9rem; }
@@ -64,17 +66,29 @@
     background: #e5e7eb;
     border-bottom: 1px solid #d1d5db;
   }
-  tbody td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #eee; vertical-align: middle; }
+  tbody td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #eee; vertical-align: top; }
   tbody tr:hover { background: #f9fafb; }
-  .tabela-wrap { max-height: 60vh; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; }
-  .col-check { text-align: center; width: 5.5rem; }
-  .col-check input { width: 1.1rem; height: 1.1rem; cursor: pointer; }
+  .tabela-wrap { max-height: 70vh; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; }
 
-  .pill { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.75rem; }
+  .pill { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.75rem; margin: 0.1rem 0.2rem 0.1rem 0; }
   .pill.classificada { background: #def7ec; color: #03543f; }
   .pill.pendente { background: #eee; color: #666; }
+  .tag-chip { background: #e0e7ff; color: #3730a3; }
+  .tag-chip .rel { font-weight: 600; }
 
-  .rodape-nav { margin-top: 2rem; font-size: 0.85rem; }
+  .painel-regras { background: #f3f4f6; border-radius: 6px; padding: 0.75rem; }
+  .regra-bloco { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.6rem 0.75rem; margin-bottom: 0.6rem; }
+  .regra-linha-topo { display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap; margin-bottom: 0.5rem; }
+  .regra-linha-topo .campo label { font-size: 0.7rem; }
+  .grupos-tags { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .grupo-tags { min-width: 200px; }
+  .grupo-tags h4 { margin: 0 0 0.3rem; font-size: 0.75rem; color: #555; text-transform: uppercase; }
+  .lista-checks { max-height: 8rem; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 4px; padding: 0.3rem 0.4rem; background: #fafafa; }
+  .lista-checks label { display: block; font-size: 0.8rem; padding: 0.1rem 0; cursor: pointer; }
+  .lista-checks .vazio-grupo { color: #888; font-size: 0.75rem; }
+  .regra-acoes { margin-top: 0.5rem; display: flex; gap: 0.5rem; }
+
+  .rodape-nav { margin-top: 2rem; font-size: 0.85rem; display: flex; gap: 1rem; }
 
   @media (prefers-color-scheme: dark) {
     body { color: #e5e7eb; background: #111827; }
@@ -92,12 +106,16 @@
     #mensagem.sucesso { background: #04351f; color: #6ee7b7; }
     .pill.classificada { background: #04351f; color: #6ee7b7; }
     .pill.pendente { background: #263244; color: #9ca3af; }
+    .tag-chip { background: #312e81; color: #c7d2fe; }
+    .painel-regras { background: #1f2937; }
+    .regra-bloco { background: #111827; border-color: #374151; }
+    .lista-checks { background: #1a2333; border-color: #374151; }
   }
 </style>
 </head>
 <body>
   <h1>Configuração de Relatórios</h1>
-  <div class="subtitulo">Classifique cada conta contábil para DRE, Balanço e Fluxo de Caixa. Uma conta pode pertencer a mais de um relatório.</div>
+  <div class="subtitulo">Marque, para cada conta, uma ou mais tags apontando para a estrutura de DRE/Balanço/Fluxo de Caixa. Cada regra pode ser restrita, opcionalmente, por natureza (D/C) e centro de custo.</div>
 
   <div class="painel">
     <div class="campo">
@@ -128,7 +146,7 @@
       <label for="empresaDestino">Copiar para</label>
       <select id="empresaDestino" disabled><option value="">—</option></select>
     </div>
-    <button id="btn-copiar" class="secundario" disabled>Copiar classificações</button>
+    <button id="btn-copiar" class="secundario" disabled>Copiar estrutura + classificações</button>
   </div>
 
   <div id="mensagem"></div>
@@ -139,22 +157,29 @@
         <tr>
           <th>Conta</th>
           <th>Descrição</th>
-          <th class="col-check">DRE</th>
-          <th class="col-check">Balanço</th>
-          <th class="col-check">Fluxo de Caixa</th>
+          <th>Tags</th>
           <th>Status</th>
           <th></th>
         </tr>
       </thead>
       <tbody id="tabela-corpo">
-        <tr><td colspan="7" style="text-align:center; color:#888; padding: 2rem;">Carregue as empresas e clique em "Atualizar".</td></tr>
+        <tr><td colspan="5" style="text-align:center; color:#888; padding: 2rem;">Carregue as empresas e clique em "Atualizar".</td></tr>
       </tbody>
     </table>
   </div>
 
-  <div class="rodape-nav"><a href="/">← Saldo total do período</a></div>
+  <div class="rodape-nav">
+    <a href="/">← Saldo total do período</a>
+    <a href="/estrutura.html">Estrutura de relatórios (grupos/subgrupos) →</a>
+  </div>
 
   <script>
+    const RELATORIOS = [
+      { chave: 'dre', label: 'DRE' },
+      { chave: 'balanco', label: 'Balanço' },
+      { chave: 'fluxoCaixa', label: 'Fluxo de Caixa' },
+    ];
+
     const apiKeyInput = document.getElementById('apiKey');
     const empresaSelect = document.getElementById('empresa');
     const empresaOrigemSelect = document.getElementById('empresaOrigem');
@@ -163,6 +188,11 @@
     const tabelaCorpo = document.getElementById('tabela-corpo');
     const mensagem = document.getElementById('mensagem');
 
+    // Estrutura completa (nos por relatorio) da empresa atualmente carregada,
+    // usada para montar os seletores de tag e para resolver o "caminho" de
+    // cada no (ex: "Ativo Circulante > Caixa e Equivalentes") nos chips.
+    let estruturaPorRelatorio = { dre: [], balanco: [], fluxoCaixa: [] };
+
     function apiKey() { return apiKeyInput.value.trim(); }
 
     function mostrarMensagem(texto, tipo) {
@@ -170,10 +200,7 @@
       mensagem.style.display = 'block';
       mensagem.textContent = texto;
     }
-
-    function limparMensagem() {
-      mensagem.style.display = 'none';
-    }
+    function limparMensagem() { mensagem.style.display = 'none'; }
 
     async function api(path, options = {}) {
       const res = await fetch(path, {
@@ -181,10 +208,15 @@
         headers: { 'X-API-KEY': apiKey(), 'Content-Type': 'application/json', ...(options.headers || {}) },
       });
       const dados = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(dados.error || `Erro ${res.status}`);
-      }
+      if (!res.ok) throw new Error(dados.error || `Erro ${res.status}`);
       return dados;
+    }
+
+    function qs(params) {
+      return Object.entries(params)
+        .filter(([, v]) => v !== undefined && v !== null)
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join('&');
     }
 
     function preencherSelect(select, empresas, comPlaceholder) {
@@ -223,7 +255,231 @@
       }
     });
 
-    function linhaTabela(item, empresa) {
+    // Constroi, para cada relatorio, um mapa nodeId -> caminho completo
+    // (ex: "Ativo Circulante > Caixa e Equivalentes"), subindo pela cadeia de
+    // parentId.
+    function caminhosPorRelatorio() {
+      const resultado = {};
+      for (const { chave } of RELATORIOS) {
+        const nos = estruturaPorRelatorio[chave] || [];
+        const porId = new Map(nos.map((n) => [n.id, n]));
+        const caminho = new Map();
+        function resolver(id) {
+          if (caminho.has(id)) return caminho.get(id);
+          const no = porId.get(id);
+          if (!no) return '(grupo removido)';
+          const partes = no.parentId ? [resolver(no.parentId), no.nome] : [no.nome];
+          const texto = partes.join(' > ');
+          caminho.set(id, texto);
+          return texto;
+        }
+        for (const no of nos) resolver(no.id);
+        resultado[chave] = caminho;
+      }
+      return resultado;
+    }
+
+    function labelRelatorio(chave) {
+      return RELATORIOS.find((r) => r.chave === chave)?.label || chave;
+    }
+
+    function renderizarChipsConta(item, caminhos) {
+      const span = document.createElement('span');
+      const tags = [];
+      for (const regra of item.regras) {
+        for (const tag of regra.tags) {
+          const caminho = (caminhos[tag.relatorio] && caminhos[tag.relatorio].get(tag.nodeId)) || '(grupo removido)';
+          const detalhes = [regra.natureza, regra.centroCusto ? `CC ${regra.centroCusto}` : null].filter(Boolean).join(', ');
+          tags.push({ relatorio: tag.relatorio, texto: caminho + (detalhes ? ` (${detalhes})` : '') });
+        }
+      }
+      if (tags.length === 0) {
+        span.textContent = '—';
+        return span;
+      }
+      for (const tag of tags) {
+        const chip = document.createElement('span');
+        chip.className = 'pill tag-chip';
+        chip.innerHTML = `<span class="rel">${labelRelatorio(tag.relatorio)}:</span> ${tag.texto}`;
+        span.appendChild(chip);
+      }
+      return span;
+    }
+
+    function criarGrupoChecks(chave, tagsSelecionadas, caminhos) {
+      const wrap = document.createElement('div');
+      wrap.className = 'grupo-tags';
+      wrap.dataset.relatorio = chave;
+
+      const h4 = document.createElement('h4');
+      h4.textContent = labelRelatorio(chave);
+      wrap.appendChild(h4);
+
+      const nos = estruturaPorRelatorio[chave] || [];
+      const lista = document.createElement('div');
+      lista.className = 'lista-checks';
+
+      if (nos.length === 0) {
+        const vazio = document.createElement('div');
+        vazio.className = 'vazio-grupo';
+        vazio.textContent = 'Nenhum grupo cadastrado.';
+        lista.appendChild(vazio);
+      } else {
+        const ordenados = [...nos].sort((a, b) => caminhos[chave].get(a.id).localeCompare(caminhos[chave].get(b.id)));
+        for (const no of ordenados) {
+          const label = document.createElement('label');
+          const check = document.createElement('input');
+          check.type = 'checkbox';
+          check.value = no.id;
+          check.checked = tagsSelecionadas.some((t) => t.relatorio === chave && t.nodeId === no.id);
+          label.appendChild(check);
+          label.append(' ' + caminhos[chave].get(no.id));
+          lista.appendChild(label);
+        }
+      }
+      wrap.appendChild(lista);
+      return wrap;
+    }
+
+    function coletarTagsSelecionadas(blocoEl) {
+      const tags = [];
+      for (const grupo of blocoEl.querySelectorAll('.grupo-tags')) {
+        const relatorio = grupo.dataset.relatorio;
+        for (const check of grupo.querySelectorAll('input[type=checkbox]:checked')) {
+          tags.push({ relatorio, nodeId: check.value });
+        }
+      }
+      return tags;
+    }
+
+    function criarBlocoRegra(regra, item, empresa, caminhos, aoMudar) {
+      const bloco = document.createElement('div');
+      bloco.className = 'regra-bloco';
+
+      const topo = document.createElement('div');
+      topo.className = 'regra-linha-topo';
+
+      const campoNatureza = document.createElement('div');
+      campoNatureza.className = 'campo';
+      campoNatureza.innerHTML = '<label>Natureza</label>';
+      const selectNatureza = document.createElement('select');
+      selectNatureza.innerHTML = '<option value="">Qualquer</option><option value="D">Débito (D)</option><option value="C">Crédito (C)</option>';
+      selectNatureza.value = regra.natureza || '';
+      campoNatureza.appendChild(selectNatureza);
+
+      const campoCC = document.createElement('div');
+      campoCC.className = 'campo';
+      campoCC.innerHTML = '<label>Centro de Custo</label>';
+      const inputCC = document.createElement('input');
+      inputCC.type = 'text';
+      inputCC.placeholder = 'vazio = qualquer';
+      inputCC.value = regra.centroCusto || '';
+      campoCC.appendChild(inputCC);
+
+      topo.append(campoNatureza, campoCC);
+      bloco.appendChild(topo);
+
+      const grupos = document.createElement('div');
+      grupos.className = 'grupos-tags';
+      for (const { chave } of RELATORIOS) {
+        grupos.appendChild(criarGrupoChecks(chave, regra.tags, caminhos));
+      }
+      bloco.appendChild(grupos);
+
+      const acoes = document.createElement('div');
+      acoes.className = 'regra-acoes';
+
+      const btnSalvar = document.createElement('button');
+      btnSalvar.className = 'linha';
+      btnSalvar.textContent = 'Salvar regra';
+      btnSalvar.addEventListener('click', async () => {
+        btnSalvar.disabled = true;
+        try {
+          const corpo = {
+            natureza: selectNatureza.value || null,
+            centroCusto: inputCC.value.trim() || null,
+            tags: coletarTagsSelecionadas(bloco),
+          };
+          if (regra.id) {
+            const salvo = await api(`/api/contabil/contas/${encodeURIComponent(item.conta)}/regras/${encodeURIComponent(regra.id)}?${qs({ empresa })}`, {
+              method: 'PUT',
+              body: JSON.stringify(corpo),
+            });
+            Object.assign(regra, salvo);
+          } else {
+            const salvo = await api(`/api/contabil/contas/${encodeURIComponent(item.conta)}/regras?${qs({ empresa })}`, {
+              method: 'POST',
+              body: JSON.stringify(corpo),
+            });
+            Object.assign(regra, salvo);
+            item.regras.push(regra);
+          }
+          mostrarMensagem('Regra salva.', 'sucesso');
+          aoMudar();
+        } catch (err) {
+          mostrarMensagem(err.message, 'erro');
+        } finally {
+          btnSalvar.disabled = false;
+        }
+      });
+
+      const btnExcluir = document.createElement('button');
+      btnExcluir.className = 'linha perigo';
+      btnExcluir.textContent = regra.id ? 'Excluir regra' : 'Remover';
+      btnExcluir.addEventListener('click', async () => {
+        if (!regra.id) {
+          item.regrasEmEdicaoExtra = (item.regrasEmEdicaoExtra || []).filter((r) => r !== regra);
+          aoMudar();
+          return;
+        }
+        try {
+          await api(`/api/contabil/contas/${encodeURIComponent(item.conta)}/regras/${encodeURIComponent(regra.id)}?${qs({ empresa })}`, {
+            method: 'DELETE',
+          });
+          item.regras = item.regras.filter((r) => r.id !== regra.id);
+          mostrarMensagem('Regra excluída.', 'sucesso');
+          aoMudar();
+        } catch (err) {
+          mostrarMensagem(err.message, 'erro');
+        }
+      });
+
+      acoes.append(btnSalvar, btnExcluir);
+      bloco.appendChild(acoes);
+      return bloco;
+    }
+
+    function criarPainelRegras(item, empresa, caminhos, aoMudar) {
+      const painel = document.createElement('div');
+      painel.className = 'painel-regras';
+
+      const todasRegras = [...item.regras, ...(item.regrasEmEdicaoExtra || [])];
+      if (todasRegras.length === 0) {
+        const vazio = document.createElement('div');
+        vazio.style.marginBottom = '0.5rem';
+        vazio.style.fontSize = '0.85rem';
+        vazio.style.color = '#888';
+        vazio.textContent = 'Nenhuma regra ainda para esta conta.';
+        painel.appendChild(vazio);
+      }
+      for (const regra of todasRegras) {
+        painel.appendChild(criarBlocoRegra(regra, item, empresa, caminhos, aoMudar));
+      }
+
+      const btnNova = document.createElement('button');
+      btnNova.className = 'secundario';
+      btnNova.textContent = '+ Nova regra';
+      btnNova.addEventListener('click', () => {
+        item.regrasEmEdicaoExtra = item.regrasEmEdicaoExtra || [];
+        item.regrasEmEdicaoExtra.push({ id: null, conta: item.conta, natureza: null, centroCusto: null, tags: [] });
+        aoMudar();
+      });
+      painel.appendChild(btnNova);
+
+      return painel;
+    }
+
+    function linhaTabela(item, empresa, caminhos) {
       const tr = document.createElement('tr');
       tr.dataset.conta = item.conta.toLowerCase();
       tr.dataset.descricao = (item.descricaoConta || '').toLowerCase();
@@ -234,60 +490,59 @@
       const tdDescricao = document.createElement('td');
       tdDescricao.textContent = item.descricaoConta || '';
 
-      const criarCheckbox = (campo) => {
-        const td = document.createElement('td');
-        td.className = 'col-check';
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        input.checked = !!item[campo];
-        input.dataset.campo = campo;
-        td.appendChild(input);
-        return { td, input };
-      };
-
-      const dre = criarCheckbox('dre');
-      const balanco = criarCheckbox('balanco');
-      const fluxoCaixa = criarCheckbox('fluxoCaixa');
+      const tdTags = document.createElement('td');
+      tdTags.appendChild(renderizarChipsConta(item, caminhos));
 
       const tdStatus = document.createElement('td');
       const pill = document.createElement('span');
-      function atualizarPill() {
-        const classificada = dre.input.checked || balanco.input.checked || fluxoCaixa.input.checked;
-        pill.className = 'pill ' + (classificada ? 'classificada' : 'pendente');
-        pill.textContent = classificada ? 'Classificada' : 'Pendente';
-      }
-      atualizarPill();
-      [dre.input, balanco.input, fluxoCaixa.input].forEach((input) => input.addEventListener('change', atualizarPill));
+      const temTag = item.regras.some((r) => r.tags.length > 0);
+      pill.className = 'pill ' + (temTag ? 'classificada' : 'pendente');
+      pill.textContent = temTag ? 'Classificada' : 'Pendente';
       tdStatus.appendChild(pill);
 
       const tdAcao = document.createElement('td');
-      const btnSalvar = document.createElement('button');
-      btnSalvar.className = 'linha';
-      btnSalvar.textContent = 'Salvar';
-      btnSalvar.addEventListener('click', async () => {
-        btnSalvar.disabled = true;
-        const textoOriginal = btnSalvar.textContent;
-        try {
-          await api(`/api/contabil/contas/${encodeURIComponent(item.conta)}?empresa=${encodeURIComponent(empresa)}`, {
-            method: 'PUT',
-            body: JSON.stringify({
-              dre: dre.input.checked,
-              balanco: balanco.input.checked,
-              fluxoCaixa: fluxoCaixa.input.checked,
-            }),
-          });
-          btnSalvar.textContent = 'Salvo ✓';
-          setTimeout(() => { btnSalvar.textContent = textoOriginal; }, 1500);
-        } catch (err) {
-          mostrarMensagem(`Falha ao salvar a conta ${item.conta}: ${err.message}`, 'erro');
-        } finally {
-          btnSalvar.disabled = false;
-        }
-      });
-      tdAcao.appendChild(btnSalvar);
+      const btnEditar = document.createElement('button');
+      btnEditar.className = 'linha secundario';
+      btnEditar.textContent = 'Editar';
+      tdAcao.appendChild(btnEditar);
 
-      tr.append(tdConta, tdDescricao, dre.td, balanco.td, fluxoCaixa.td, tdStatus, tdAcao);
-      return tr;
+      tr.append(tdConta, tdDescricao, tdTags, tdStatus, tdAcao);
+
+      const trDetalhe = document.createElement('tr');
+      const tdDetalhe = document.createElement('td');
+      tdDetalhe.colSpan = 5;
+      trDetalhe.appendChild(tdDetalhe);
+      trDetalhe.style.display = 'none';
+
+      function renderDetalhe() {
+        tdDetalhe.innerHTML = '';
+        tdDetalhe.appendChild(criarPainelRegras(item, empresa, caminhos, () => {
+          renderDetalhe();
+          // Atualiza os chips/status da linha principal sem recarregar tudo.
+          tdTags.innerHTML = '';
+          tdTags.appendChild(renderizarChipsConta(item, caminhos));
+          const temTagAgora = item.regras.some((r) => r.tags.length > 0);
+          pill.className = 'pill ' + (temTagAgora ? 'classificada' : 'pendente');
+          pill.textContent = temTagAgora ? 'Classificada' : 'Pendente';
+        }));
+      }
+
+      btnEditar.addEventListener('click', () => {
+        const aberto = trDetalhe.style.display !== 'none';
+        trDetalhe.style.display = aberto ? 'none' : '';
+        btnEditar.textContent = aberto ? 'Editar' : 'Fechar';
+        if (!aberto) renderDetalhe();
+      });
+
+      return [tr, trDetalhe];
+    }
+
+    async function carregarEstrutura(empresa) {
+      const resultados = await Promise.all(
+        RELATORIOS.map(({ chave }) => api(`/api/contabil/estrutura?${qs({ empresa, relatorio: chave })}`))
+      );
+      estruturaPorRelatorio = {};
+      RELATORIOS.forEach(({ chave }, i) => { estruturaPorRelatorio[chave] = resultados[i]; });
     }
 
     document.getElementById('btn-atualizar').addEventListener('click', async () => {
@@ -297,16 +552,20 @@
         mostrarMensagem('Selecione uma empresa.', 'erro');
         return;
       }
-      tabelaCorpo.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem;">Carregando...</td></tr>';
+      tabelaCorpo.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;">Carregando...</td></tr>';
       try {
-        const contas = await api(`/api/contabil/contas?empresa=${encodeURIComponent(empresa)}`);
+        const [contas] = await Promise.all([
+          api(`/api/contabil/contas?${qs({ empresa })}`),
+          carregarEstrutura(empresa),
+        ]);
+        const caminhos = caminhosPorRelatorio();
         tabelaCorpo.innerHTML = '';
         if (contas.length === 0) {
-          tabelaCorpo.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 2rem;">Nenhuma conta encontrada para essa empresa.</td></tr>';
+          tabelaCorpo.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 2rem;">Nenhuma conta encontrada para essa empresa.</td></tr>';
           return;
         }
         for (const item of contas) {
-          tabelaCorpo.appendChild(linhaTabela(item, empresa));
+          for (const el of linhaTabela(item, empresa, caminhos)) tabelaCorpo.appendChild(el);
         }
       } catch (err) {
         tabelaCorpo.innerHTML = '';
@@ -319,6 +578,8 @@
       for (const tr of tabelaCorpo.querySelectorAll('tr[data-conta]')) {
         const bate = !termo || tr.dataset.conta.includes(termo) || tr.dataset.descricao.includes(termo);
         tr.style.display = bate ? '' : 'none';
+        const detalhe = tr.nextElementSibling;
+        if (detalhe && !detalhe.dataset.conta) detalhe.style.display = bate ? detalhe.style.display : 'none';
       }
     });
 
@@ -348,7 +609,7 @@
           return;
         }
         mostrarMensagem(
-          `Isso vai sobrescrever, em "${empresaDestino}", a classificação de todas as contas que existirem em "${empresaOrigem}". Clique em "Confirmar cópia" de novo para continuar.`,
+          `Isso vai sobrescrever, em "${empresaDestino}", toda a estrutura e as regras de classificação que existirem em "${empresaOrigem}". Clique em "Confirmar cópia" de novo para continuar.`,
           'erro'
         );
         aguardandoConfirmacaoCopia = true;
@@ -364,7 +625,7 @@
           method: 'POST',
           body: JSON.stringify({ empresaOrigem, empresaDestino }),
         });
-        mostrarMensagem(`${resultado.contasCopiadas} conta(s) copiada(s) para ${empresaDestino}.`, 'sucesso');
+        mostrarMensagem(`${resultado.contasCopiadas} regra(s) copiada(s) para ${empresaDestino}.`, 'sucesso');
         if (empresaSelect.value === empresaDestino) {
           document.getElementById('btn-atualizar').click();
         }

@@ -33,6 +33,7 @@ function createApp() {
 
   const contabilRouter = require('./routes/contabil');
   const contasRouter = require('./routes/contas');
+  const estruturaRouter = require('./routes/estrutura');
 
   const app = express();
   app.use(express.json());
@@ -54,6 +55,7 @@ function createApp() {
 
   app.use('/api/contabil/balancete', apiKeyAuth, contabilRouter);
   app.use('/api/contabil/contas', apiKeyAuth, contasRouter);
+  app.use('/api/contabil/estrutura', apiKeyAuth, estruturaRouter);
 
   app.use((req, res) => {
     res.status(404).json({ error: 'Rota não encontrada.' });

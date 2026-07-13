@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8" />
+<title>Estrutura de Relatórios — portal-backend</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, sans-serif;
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 0 1rem 3rem;
+    color: #1a1a1a;
+    background: #fff;
+  }
+  h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+  .subtitulo { font-size: 0.85rem; color: #666; margin-bottom: 1.5rem; }
+  a { color: #1a56db; }
+
+  .painel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: end;
+    padding: 1rem;
+    border-radius: 8px;
+    background: #f3f4f6;
+    margin-bottom: 1rem;
+  }
+  .campo { display: flex; flex-direction: column; gap: 0.25rem; }
+  .campo label { font-size: 0.75rem; color: #555; }
+  input, select {
+    padding: 0.45rem 0.6rem;
+    font-size: 0.9rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    color: #1a1a1a;
+    background: #fff;
+  }
+  button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    border: none;
+    border-radius: 4px;
+    background: #1a56db;
+    color: #fff;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button.secundario { background: #4b5563; }
+  button.perigo { background: #9b1c1c; }
+  button.pequeno { padding: 0.25rem 0.55rem; font-size: 0.75rem; }
+  button:disabled { background: #9ab0e0; cursor: default; }
+
+  #mensagem { margin: 0.75rem 0; padding: 0.6rem 0.9rem; border-radius: 6px; background: #f3f4f6; display: none; font-size: 0.9rem; }
+  #mensagem.erro { background: #fde8e8; color: #9b1c1c; }
+  #mensagem.sucesso { background: #def7ec; color: #03543f; }
+
+  .arvore-wrap {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    min-height: 6rem;
+  }
+  ul.arvore { list-style: none; margin: 0; padding-left: 1.25rem; }
+  ul.arvore.raiz { padding-left: 0; }
+  li.no { margin: 0.35rem 0; }
+  .linha-no {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    background: #f9fafb;
+  }
+  .linha-no .nome { flex: 1; font-size: 0.9rem; }
+  .linha-no input.editar-nome { flex: 1; font-size: 0.9rem; padding: 0.25rem 0.4rem; }
+  .form-add {
+    display: flex;
+    gap: 0.4rem;
+    margin: 0.4rem 0 0.4rem 1.25rem;
+    align-items: center;
+  }
+  .form-add input { font-size: 0.85rem; padding: 0.3rem 0.5rem; flex: 1; }
+  .form-add select { font-size: 0.85rem; padding: 0.3rem 0.4rem; }
+  .vazio { color: #888; font-size: 0.9rem; padding: 1rem 0; text-align: center; }
+
+  .badge-sinal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border: none;
+    flex: none;
+  }
+  .badge-sinal.soma { background: #def7ec; color: #03543f; }
+  .badge-sinal.subtrai { background: #fde8e8; color: #9b1c1c; }
+  .badge-sinal.resultado { background: #e0e7ff; color: #3730a3; }
+
+  .rodape-nav { margin-top: 2rem; font-size: 0.85rem; display: flex; gap: 1rem; }
+
+  @media (prefers-color-scheme: dark) {
+    body { color: #e5e7eb; background: #111827; }
+    .subtitulo { color: #9ca3af; }
+    .painel { background: #1f2937; }
+    .campo label { color: #9ca3af; }
+    input, select { color: #e5e7eb; background: #1f2937; border-color: #374151; }
+    button.secundario { background: #374151; }
+    #mensagem { background: #1f2937; }
+    #mensagem.erro { background: #4c1d1d; color: #fca5a5; }
+    #mensagem.sucesso { background: #04351f; color: #6ee7b7; }
+    .arvore-wrap { border-color: #374151; }
+    .linha-no { background: #1a2333; }
+    .vazio { color: #9ca3af; }
+    .badge-sinal.soma { background: #04351f; color: #6ee7b7; }
+    .badge-sinal.subtrai { background: #4c1d1d; color: #fca5a5; }
+    .badge-sinal.resultado { background: #312e81; color: #c7d2fe; }
+  }
+</style>
+</head>
+<body>
+  <h1>Estrutura de Relatórios</h1>
+  <div class="subtitulo">Monte livremente os grupos e subgrupos de DRE, Balanço e Fluxo de Caixa. Depois, use essa estrutura para marcar as tags de cada conta em "Configuração de Relatórios".</div>
+
+  <div class="painel">
+    <div class="campo">
+      <label for="apiKey">API Key</label>
+      <input id="apiKey" type="text" autocomplete="off" style="min-width: 260px;" />
+    </div>
+    <button id="btn-carregar-empresas">Carregar empresas</button>
+  </div>
+
+  <div class="painel">
+    <div class="campo">
+      <label for="empresa">Empresa</label>
+      <select id="empresa" disabled style="min-width: 220px;"><option value="">— carregue as empresas —</option></select>
+    </div>
+    <div class="campo">
+      <label for="relatorio">Relatório</label>
+      <select id="relatorio" style="min-width: 180px;">
+        <option value="dre">DRE</option>
+        <option value="balanco">Balanço</option>
+        <option value="fluxoCaixa">Fluxo de Caixa</option>
+      </select>
+    </div>
+    <button id="btn-atualizar" disabled>Atualizar</button>
+  </div>
+
+  <div id="mensagem"></div>
+
+  <div class="form-add" style="margin-left: 0;">
+    <input id="novo-raiz-nome" type="text" placeholder="Nome do novo grupo raiz..." disabled />
+    <select id="novo-raiz-sinal" disabled title="Sinal: soma (+), subtrai (-) ou é um resultado/subtotal (=)">
+      <option value="+">+ soma</option>
+      <option value="-">− subtrai</option>
+      <option value="=">= resultado</option>
+    </select>
+    <button id="btn-novo-raiz" disabled>+ Novo grupo raiz</button>
+  </div>
+
+  <div class="arvore-wrap">
+    <div id="arvore-corpo"><div class="vazio">Carregue as empresas, selecione o relatório e clique em "Atualizar".</div></div>
+  </div>
+
+  <div class="rodape-nav">
+    <a href="/">← Saldo total do período</a>
+    <a href="/relatorios.html">Configuração de relatórios (tags por conta) →</a>
+  </div>
+
+  <script>
+    const apiKeyInput = document.getElementById('apiKey');
+    const empresaSelect = document.getElementById('empresa');
+    const relatorioSelect = document.getElementById('relatorio');
+    const arvoreCorpo = document.getElementById('arvore-corpo');
+    const mensagem = document.getElementById('mensagem');
+    const novoRaizNome = document.getElementById('novo-raiz-nome');
+    const novoRaizSinal = document.getElementById('novo-raiz-sinal');
+    const btnNovoRaiz = document.getElementById('btn-novo-raiz');
+
+    const CLASSE_SINAL = { '+': 'soma', '-': 'subtrai', '=': 'resultado' };
+    const PROXIMO_SINAL = { '+': '-', '-': '=', '=': '+' };
+    const TITULO_SINAL = { '+': 'Soma (+) — clique para mudar', '-': 'Subtrai (−) — clique para mudar', '=': 'Resultado/subtotal (=) — clique para mudar' };
+    const btnAtualizar = document.getElementById('btn-atualizar');
+
+    function apiKey() { return apiKeyInput.value.trim(); }
+    function empresaAtual() { return empresaSelect.value; }
+    function relatorioAtual() { return relatorioSelect.value; }
+
+    function mostrarMensagem(texto, tipo) {
+      mensagem.className = tipo || '';
+      mensagem.style.display = 'block';
+      mensagem.textContent = texto;
+    }
+    function limparMensagem() { mensagem.style.display = 'none'; }
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        ...options,
+        headers: { 'X-API-KEY': apiKey(), 'Content-Type': 'application/json', ...(options.headers || {}) },
+      });
+      const dados = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(dados.error || `Erro ${res.status}`);
+      return dados;
+    }
+
+    function qs(params) {
+      return Object.entries(params)
+        .filter(([, v]) => v !== undefined && v !== null)
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join('&');
+    }
+
+    document.getElementById('btn-carregar-empresas').addEventListener('click', async () => {
+      limparMensagem();
+      if (!apiKey()) {
+        mostrarMensagem('Informe a API Key.', 'erro');
+        return;
+      }
+      try {
+        const dados = await api('/api/contabil/empresas');
+        empresaSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '— selecione —';
+        empresaSelect.appendChild(placeholder);
+        for (const emp of dados.empresas) {
+          const opt = document.createElement('option');
+          opt.value = emp;
+          opt.textContent = emp;
+          empresaSelect.appendChild(opt);
+        }
+        empresaSelect.disabled = dados.empresas.length === 0;
+        btnAtualizar.disabled = false;
+        mostrarMensagem(`${dados.empresas.length} empresa(s) carregada(s).`, 'sucesso');
+      } catch (err) {
+        mostrarMensagem(err.message, 'erro');
+      }
+    });
+
+    function botaoConfirmavel(botao, textoConfirmar, acaoConfirmada) {
+      let aguardando = false;
+      let timeout = null;
+      const textoOriginal = botao.textContent;
+      botao.addEventListener('click', async () => {
+        if (!aguardando) {
+          aguardando = true;
+          botao.textContent = textoConfirmar;
+          timeout = setTimeout(() => { aguardando = false; botao.textContent = textoOriginal; }, 4000);
+          return;
+        }
+        clearTimeout(timeout);
+        aguardando = false;
+        botao.textContent = textoOriginal;
+        await acaoConfirmada();
+      });
+    }
+
+    function montarArvore(nos) {
+      const porPai = new Map();
+      for (const no of nos) {
+        const chave = no.parentId || '__raiz__';
+        if (!porPai.has(chave)) porPai.set(chave, []);
+        porPai.get(chave).push(no);
+      }
+      for (const lista of porPai.values()) lista.sort((a, b) => a.ordem - b.ordem);
+      return porPai;
+    }
+
+    async function recarregar() {
+      const empresa = empresaAtual();
+      const relatorio = relatorioAtual();
+      const dados = await api(`/api/contabil/estrutura?${qs({ empresa, relatorio })}`);
+      renderizarArvore(dados);
+    }
+
+    function criarBotao(texto, classe, onClick) {
+      const btn = document.createElement('button');
+      btn.textContent = texto;
+      btn.className = `pequeno ${classe || ''}`.trim();
+      btn.addEventListener('click', onClick);
+      return btn;
+    }
+
+    function renderizarNo(no, porPai) {
+      const li = document.createElement('li');
+      li.className = 'no';
+
+      const linha = document.createElement('div');
+      linha.className = 'linha-no';
+
+      const badgeSinal = document.createElement('button');
+      badgeSinal.className = `badge-sinal ${CLASSE_SINAL[no.sinal]}`;
+      badgeSinal.textContent = no.sinal;
+      badgeSinal.title = TITULO_SINAL[no.sinal];
+      badgeSinal.addEventListener('click', async () => {
+        const novoSinal = PROXIMO_SINAL[no.sinal];
+        try {
+          await api(`/api/contabil/estrutura/${encodeURIComponent(no.id)}?${qs({ empresa: empresaAtual(), relatorio: relatorioAtual() })}`, {
+            method: 'PUT',
+            body: JSON.stringify({ sinal: novoSinal }),
+          });
+          await recarregar();
+        } catch (err) { mostrarMensagem(err.message, 'erro'); }
+      });
+      linha.appendChild(badgeSinal);
+
+      const nomeSpan = document.createElement('span');
+      nomeSpan.className = 'nome';
+      nomeSpan.textContent = no.nome;
+      linha.appendChild(nomeSpan);
+
+      const btnSubitem = criarBotao('+ subitem', 'secundario', () => {
+        formAdd.style.display = formAdd.style.display === 'none' ? 'flex' : 'none';
+      });
+
+      const btnRenomear = criarBotao('Renomear', 'secundario', () => {
+        const input = document.createElement('input');
+        input.className = 'editar-nome';
+        input.value = no.nome;
+        nomeSpan.replaceWith(input);
+        input.focus();
+        const confirmar = async () => {
+          const novoNome = input.value.trim();
+          if (!novoNome || novoNome === no.nome) { input.replaceWith(nomeSpan); return; }
+          try {
+            await api(`/api/contabil/estrutura/${encodeURIComponent(no.id)}?${qs({ empresa: empresaAtual(), relatorio: relatorioAtual() })}`, {
+              method: 'PUT',
+              body: JSON.stringify({ nome: novoNome }),
+            });
+            await recarregar();
+          } catch (err) {
+            mostrarMensagem(err.message, 'erro');
+            input.replaceWith(nomeSpan);
+          }
+        };
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') confirmar(); if (e.key === 'Escape') input.replaceWith(nomeSpan); });
+        input.addEventListener('blur', confirmar);
+      });
+
+      const btnUp = criarBotao('▲', 'secundario', async () => {
+        try {
+          await api(`/api/contabil/estrutura/${encodeURIComponent(no.id)}/mover?${qs({ empresa: empresaAtual(), relatorio: relatorioAtual() })}`, {
+            method: 'POST',
+            body: JSON.stringify({ direcao: 'up' }),
+          });
+          await recarregar();
+        } catch (err) { mostrarMensagem(err.message, 'erro'); }
+      });
+
+      const btnDown = criarBotao('▼', 'secundario', async () => {
+        try {
+          await api(`/api/contabil/estrutura/${encodeURIComponent(no.id)}/mover?${qs({ empresa: empresaAtual(), relatorio: relatorioAtual() })}`, {
+            method: 'POST',
+            body: JSON.stringify({ direcao: 'down' }),
+          });
+          await recarregar();
+        } catch (err) { mostrarMensagem(err.message, 'erro'); }
+      });
+
+      const btnExcluir = criarBotao('Excluir', 'perigo', () => {});
+      botaoConfirmavel(btnExcluir, 'Confirmar?', async () => {
+        try {
+          await api(`/api/contabil/estrutura/${encodeURIComponent(no.id)}?${qs({ empresa: empresaAtual(), relatorio: relatorioAtual() })}`, {
+            method: 'DELETE',
+          });
+          await recarregar();
+        } catch (err) { mostrarMensagem(err.message, 'erro'); }
+      });
+
+      linha.append(btnSubitem, btnRenomear, btnUp, btnDown, btnExcluir);
+      li.appendChild(linha);
+
+      const formAdd = document.createElement('div');
+      formAdd.className = 'form-add';
+      formAdd.style.display = 'none';
+      const inputAdd = document.createElement('input');
+      inputAdd.type = 'text';
+      inputAdd.placeholder = 'Nome do subitem...';
+      const selectSinalAdd = document.createElement('select');
+      selectSinalAdd.innerHTML = '<option value="+">+ soma</option><option value="-">− subtrai</option><option value="=">= resultado</option>';
+      const btnConfirmarAdd = document.createElement('button');
+      btnConfirmarAdd.textContent = 'Adicionar';
+      btnConfirmarAdd.className = 'pequeno';
+      btnConfirmarAdd.addEventListener('click', async () => {
+        const nome = inputAdd.value.trim();
+        if (!nome) return;
+        try {
+          await api(`/api/contabil/estrutura?${qs({ empresa: empresaAtual() })}`, {
+            method: 'POST',
+            body: JSON.stringify({ relatorio: relatorioAtual(), nome, parentId: no.id, sinal: selectSinalAdd.value }),
+          });
+          await recarregar();
+        } catch (err) { mostrarMensagem(err.message, 'erro'); }
+      });
+      formAdd.append(inputAdd, selectSinalAdd, btnConfirmarAdd);
+      li.appendChild(formAdd);
+
+      const filhos = porPai.get(no.id) || [];
+      if (filhos.length > 0) {
+        const ul = document.createElement('ul');
+        ul.className = 'arvore';
+        for (const filho of filhos) ul.appendChild(renderizarNo(filho, porPai));
+        li.appendChild(ul);
+      }
+
+      return li;
+    }
+
+    function renderizarArvore(nos) {
+      arvoreCorpo.innerHTML = '';
+      if (nos.length === 0) {
+        arvoreCorpo.innerHTML = '<div class="vazio">Nenhum grupo criado ainda para este relatório.</div>';
+        return;
+      }
+      const porPai = montarArvore(nos);
+      const ul = document.createElement('ul');
+      ul.className = 'arvore raiz';
+      for (const raiz of porPai.get('__raiz__') || []) ul.appendChild(renderizarNo(raiz, porPai));
+      arvoreCorpo.appendChild(ul);
+    }
+
+    btnAtualizar.addEventListener('click', async () => {
+      limparMensagem();
+      const empresa = empresaAtual();
+      if (!empresa) {
+        mostrarMensagem('Selecione uma empresa.', 'erro');
+        return;
+      }
+      novoRaizNome.disabled = false;
+      novoRaizSinal.disabled = false;
+      btnNovoRaiz.disabled = false;
+      arvoreCorpo.innerHTML = '<div class="vazio">Carregando...</div>';
+      try {
+        await recarregar();
+      } catch (err) {
+        arvoreCorpo.innerHTML = '';
+        mostrarMensagem(err.message, 'erro');
+      }
+    });
+
+    relatorioSelect.addEventListener('change', () => {
+      if (empresaAtual()) btnAtualizar.click();
+    });
+
+    btnNovoRaiz.addEventListener('click', async () => {
+      const nome = novoRaizNome.value.trim();
+      if (!nome) return;
+      limparMensagem();
+      try {
+        await api(`/api/contabil/estrutura?${qs({ empresa: empresaAtual() })}`, {
+          method: 'POST',
+          body: JSON.stringify({ relatorio: relatorioAtual(), nome, parentId: null, sinal: novoRaizSinal.value }),
+        });
+        novoRaizNome.value = '';
+        await recarregar();
+      } catch (err) {
+        mostrarMensagem(err.message, 'erro');
+      }
+    });
+  </script>
+</body>
+</html>

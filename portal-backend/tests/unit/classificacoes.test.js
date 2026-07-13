@@ -18,47 +18,120 @@ afterEach(() => {
   if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
 });
 
-test('getEmpresa retorna objeto vazio quando o arquivo nao existe', () => {
+test('getEmpresa retorna lista vazia quando o arquivo nao existe', () => {
   const classificacoes = freshClassificacoes();
-  expect(classificacoes.getEmpresa('KOBE')).toEqual({});
+  expect(classificacoes.getEmpresa('KOBE')).toEqual([]);
 });
 
-test('setConta cria o arquivo e salva a classificacao (normalizando pra booleano)', () => {
+test('upsertRegra sem id cria uma nova regra com id gerado', () => {
   const classificacoes = freshClassificacoes();
-  const salvo = classificacoes.setConta('KOBE', '123', { dre: true, balanco: 'sim', fluxoCaixa: undefined });
+  const salvo = classificacoes.upsertRegra('KOBE', {
+    conta: '123',
+    natureza: 'D',
+    tags: [{ relatorio: 'dre', nodeId: 'no-1' }],
+  });
 
-  expect(salvo).toEqual({ dre: true, balanco: true, fluxoCaixa: false });
+  expect(salvo.id).toEqual(expect.any(String));
+  expect(salvo).toMatchObject({ conta: '123', natureza: 'D', centroCusto: null, tags: [{ relatorio: 'dre', nodeId: 'no-1' }] });
   expect(fs.existsSync(tmpFile)).toBe(true);
-  expect(classificacoes.getEmpresa('KOBE')).toEqual({ '123': { dre: true, balanco: true, fluxoCaixa: false } });
+  expect(classificacoes.getEmpresa('KOBE')).toEqual([salvo]);
 });
 
-test('setConta preserva outras contas/empresas ja salvas', () => {
+test('upsertRegra com id atualiza a regra existente', () => {
   const classificacoes = freshClassificacoes();
-  classificacoes.setConta('KOBE', '123', { dre: true });
-  classificacoes.setConta('KOBE', '456', { balanco: true });
-  classificacoes.setConta('ROYAL', '123', { fluxoCaixa: true });
-
-  expect(classificacoes.getEmpresa('KOBE')).toEqual({
-    '123': { dre: true, balanco: false, fluxoCaixa: false },
-    '456': { dre: false, balanco: true, fluxoCaixa: false },
+  const criada = classificacoes.upsertRegra('KOBE', { conta: '123', tags: [] });
+  const atualizada = classificacoes.upsertRegra('KOBE', {
+    id: criada.id,
+    conta: '123',
+    natureza: 'C',
+    centroCusto: '20',
+    tags: [{ relatorio: 'balanco', nodeId: 'no-2' }],
   });
-  expect(classificacoes.getEmpresa('ROYAL')).toEqual({ '123': { dre: false, balanco: false, fluxoCaixa: true } });
+
+  expect(atualizada.id).toBe(criada.id);
+  expect(classificacoes.getEmpresa('KOBE')).toEqual([atualizada]);
 });
 
-test('copyEmpresa copia as contas da origem para o destino, sobrescrevendo conflitos', () => {
+test('upsertRegra com id inexistente lanca erro', () => {
   const classificacoes = freshClassificacoes();
-  classificacoes.setConta('KOBE', '123', { dre: true });
-  classificacoes.setConta('KOBE', '456', { balanco: true });
-  classificacoes.setConta('ROYAL', '123', { fluxoCaixa: true });
-  classificacoes.setConta('ROYAL', '999', { dre: true });
+  expect(() => classificacoes.upsertRegra('KOBE', { id: 'nao-existe', conta: '123', tags: [] })).toThrow(/não encontrada/);
+});
 
-  const resultado = classificacoes.copyEmpresa('KOBE', 'ROYAL');
+test('upsertRegra valida conta obrigatoria', () => {
+  const classificacoes = freshClassificacoes();
+  expect(() => classificacoes.upsertRegra('KOBE', { tags: [] })).toThrow(/"conta" é obrigatório/);
+});
 
-  expect(resultado).toEqual({
-    '999': { dre: true, balanco: false, fluxoCaixa: false },
-    '123': { dre: true, balanco: false, fluxoCaixa: false },
-    '456': { dre: false, balanco: true, fluxoCaixa: false },
+test('upsertRegra valida natureza', () => {
+  const classificacoes = freshClassificacoes();
+  expect(() => classificacoes.upsertRegra('KOBE', { conta: '123', natureza: 'X', tags: [] })).toThrow(/"natureza"/);
+});
+
+test('upsertRegra valida relatorio da tag', () => {
+  const classificacoes = freshClassificacoes();
+  expect(() =>
+    classificacoes.upsertRegra('KOBE', { conta: '123', tags: [{ relatorio: 'invalido', nodeId: 'no-1' }] })
+  ).toThrow(/relatorio.*inválido/i);
+});
+
+test('getRegrasDaConta filtra por conta dentro da empresa', () => {
+  const classificacoes = freshClassificacoes();
+  classificacoes.upsertRegra('KOBE', { conta: '123', tags: [] });
+  classificacoes.upsertRegra('KOBE', { conta: '456', tags: [] });
+
+  expect(classificacoes.getRegrasDaConta('KOBE', '123')).toHaveLength(1);
+  expect(classificacoes.getRegrasDaConta('KOBE', '999')).toEqual([]);
+});
+
+test('deleteRegra remove a regra e retorna true; false se nao existia', () => {
+  const classificacoes = freshClassificacoes();
+  const regra = classificacoes.upsertRegra('KOBE', { conta: '123', tags: [] });
+
+  expect(classificacoes.deleteRegra('KOBE', regra.id)).toBe(true);
+  expect(classificacoes.getEmpresa('KOBE')).toEqual([]);
+  expect(classificacoes.deleteRegra('KOBE', regra.id)).toBe(false);
+});
+
+test('removerTagsDeNode limpa apenas as tags que apontam para os nodeIds removidos', () => {
+  const classificacoes = freshClassificacoes();
+  const regra = classificacoes.upsertRegra('KOBE', {
+    conta: '123',
+    tags: [
+      { relatorio: 'dre', nodeId: 'no-apagado' },
+      { relatorio: 'balanco', nodeId: 'no-mantido' },
+    ],
   });
+
+  classificacoes.removerTagsDeNode('KOBE', ['no-apagado']);
+
+  const [atualizada] = classificacoes.getRegrasDaConta('KOBE', '123');
+  expect(atualizada.id).toBe(regra.id);
+  expect(atualizada.tags).toEqual([{ relatorio: 'balanco', nodeId: 'no-mantido' }]);
+});
+
+test('copyEmpresa copia as regras remapeando os nodeIds das tags via mapeamento', () => {
+  const classificacoes = freshClassificacoes();
+  classificacoes.upsertRegra('KOBE', {
+    conta: '123',
+    natureza: 'D',
+    tags: [
+      { relatorio: 'dre', nodeId: 'old-1' },
+      { relatorio: 'balanco', nodeId: 'sem-mapeamento' },
+    ],
+  });
+
+  const mapeamento = { dre: { 'old-1': 'new-1' }, balanco: {}, fluxoCaixa: {} };
+  const destino = classificacoes.copyEmpresa('KOBE', 'ROYAL', mapeamento);
+
+  expect(destino).toHaveLength(1);
+  expect(destino[0].conta).toBe('123');
+  expect(destino[0].id).toEqual(expect.any(String));
+  // Tag sem mapeamento correspondente e descartada (nao aponta pra lugar nenhum no destino).
+  expect(destino[0].tags).toEqual([{ relatorio: 'dre', nodeId: 'new-1' }]);
+  expect(classificacoes.getEmpresa('ROYAL')).toEqual(destino);
+
+  // Nao afeta a origem.
+  expect(classificacoes.getEmpresa('KOBE')).toHaveLength(1);
 });
 
 test('arquivo com JSON invalido lanca erro claro', () => {
