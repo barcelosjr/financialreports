@@ -22,6 +22,31 @@ function slugify(texto) {
     .replace(/(^-|-$)/g, '');
 }
 
+const PALAVRAS_IGNORADAS_PREFIXO = new Set(['de', 'da', 'do', 'e']);
+
+// Chave de contrato gerada automaticamente (sem edição manual na tela de
+// cadastro) assim que o grupo tiver ao menos uma empresa — hoje é só um
+// identificador; no futuro deve disparar a geração do contrato empresarial
+// em PDF e o envio por e-mail para o sócio/administrador de cada empresa
+// assinar (ver README, seção "Próximos passos").
+function gerarChaveContrato(nomeGrupo, chavesExistentes) {
+  const palavras = nomeGrupo
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .split(/\s+/)
+    .filter((p) => p && !PALAVRAS_IGNORADAS_PREFIXO.has(p.toLowerCase()));
+  const prefixo = ((palavras[0]?.[0] || 'G') + (palavras[1]?.[0] || palavras[0]?.[1] || 'X')).toUpperCase();
+  const ano = new Date().getFullYear();
+
+  let chave;
+  do {
+    const sequencial = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+    chave = `${prefixo}-${ano}-${sequencial}`;
+  } while (chavesExistentes.has(chave));
+
+  return chave;
+}
+
 export function AppProvider({ children }) {
   const [autenticado, setAutenticado] = useState(false);
   const [usuarioAtualId, setUsuarioAtualId] = useState(usuarios[0].id);
@@ -64,8 +89,9 @@ export function AppProvider({ children }) {
     return grupos.find((g) => g.id === grupoId) ?? null;
   }
 
-  function adicionarGrupo({ nome, contrato, plano }) {
-    const novoGrupo = { id: `grupo-${slugify(nome)}-${Date.now()}`, nome, contrato, plano, empresas: [] };
+  function adicionarGrupo({ nome, plano }) {
+    // contrato começa vazio: só é gerado quando a primeira empresa é cadastrada.
+    const novoGrupo = { id: `grupo-${slugify(nome)}-${Date.now()}`, nome, contrato: null, plano, empresas: [] };
     setGrupos((prev) => [...prev, novoGrupo]);
     return novoGrupo;
   }
@@ -78,9 +104,16 @@ export function AppProvider({ children }) {
     setGrupos((prev) => prev.filter((g) => g.id !== grupoId));
   }
 
-  function adicionarEmpresa(grupoId, { codigo, nome, cnpj }) {
-    const novaEmpresa = { id: `empresa-${slugify(nome)}-${Date.now()}`, codigo, nome, cnpj };
-    setGrupos((prev) => prev.map((g) => (g.id === grupoId ? { ...g, empresas: [...g.empresas, novaEmpresa] } : g)));
+  function adicionarEmpresa(grupoId, { codigo, nome, cnpj, conexao }) {
+    const novaEmpresa = { id: `empresa-${slugify(nome)}-${Date.now()}`, codigo, nome, cnpj, conexao: conexao ?? null };
+    setGrupos((prev) =>
+      prev.map((g) => {
+        if (g.id !== grupoId) return g;
+        const chavesExistentes = new Set(prev.map((p) => p.contrato).filter(Boolean));
+        const contrato = g.contrato ?? gerarChaveContrato(g.nome, chavesExistentes);
+        return { ...g, contrato, empresas: [...g.empresas, novaEmpresa] };
+      })
+    );
     return novaEmpresa;
   }
 

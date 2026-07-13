@@ -59,3 +59,10 @@ produto, sem precisar deslogar.
   cliente/grupo, não login individual).
 - Persistir as permissões de usuário (empresas/relatórios liberados) e o
   cadastro de grupos/empresas, hoje só em estado local do React.
+- Gerar automaticamente, ao cadastrar o grupo econômico junto com suas
+  empresas, o contrato empresarial (PDF) de cada uma e enviar por e-mail
+  para o sócio/administrador assinar e confirmar — hoje só a chave de
+  contrato (`GK-2026-0001`) é gerada, sem o documento em si.
+- Testar de verdade a conexão Power BI configurada por empresa (hoje o
+  "Testar conexão" em `EmpresaFormModal` só valida formato de GUID no
+  frontend; precisa bater no `portal-backend`/Azure AD de fato).

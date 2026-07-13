@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
+import { KeyRound } from 'lucide-react';
 import Modal from '../../components/Modal';
 
-const VAZIO = { nome: '', contrato: '', plano: '' };
+const VAZIO = { nome: '', plano: '' };
 
 export default function GrupoFormModal({ aberto, onClose, onSalvar, grupoInicial }) {
   const [form, setForm] = useState(VAZIO);
 
   useEffect(() => {
     if (!aberto) return;
-    setForm(grupoInicial ? { nome: grupoInicial.nome, contrato: grupoInicial.contrato, plano: grupoInicial.plano } : VAZIO);
+    setForm(grupoInicial ? { nome: grupoInicial.nome, plano: grupoInicial.plano } : VAZIO);
   }, [aberto, grupoInicial]);
 
   function handleSalvar() {
-    if (!form.nome || !form.contrato) return;
+    if (!form.nome) return;
     onSalvar(form);
     onClose();
   }
@@ -41,15 +42,6 @@ export default function GrupoFormModal({ aberto, onClose, onSalvar, grupoInicial
           />
         </div>
         <div>
-          <label className="label">Chave de contrato</label>
-          <input
-            className="input"
-            value={form.contrato}
-            onChange={(e) => setForm((f) => ({ ...f, contrato: e.target.value }))}
-            placeholder="Ex: GK-2026-0001"
-          />
-        </div>
-        <div>
           <label className="label">Plano</label>
           <input
             className="input"
@@ -57,6 +49,21 @@ export default function GrupoFormModal({ aberto, onClose, onSalvar, grupoInicial
             onChange={(e) => setForm((f) => ({ ...f, plano: e.target.value }))}
             placeholder="Ex: Plano Grupo — até 5 empresas"
           />
+        </div>
+
+        <div className="rounded-lg bg-sand-100 dark:bg-sand-800 px-3.5 py-3 flex items-start gap-2.5">
+          <KeyRound size={15} className="text-sand-400 mt-0.5 shrink-0" />
+          {grupoInicial?.contrato ? (
+            <p className="text-sm text-sand-600 dark:text-sand-300">
+              Chave de contrato: <span className="font-medium text-sand-800 dark:text-sand-100">{grupoInicial.contrato}</span>
+              <br />
+              <span className="text-xs text-sand-400">Gerada automaticamente, não pode ser editada.</span>
+            </p>
+          ) : (
+            <p className="text-sm text-sand-500 dark:text-sand-400">
+              A chave de contrato é gerada automaticamente quando a primeira empresa deste grupo for cadastrada.
+            </p>
+          )}
         </div>
       </div>
     </Modal>

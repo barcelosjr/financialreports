@@ -1,10 +1,25 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, KeyRound, Package } from 'lucide-react';
+import { Plus, Pencil, Trash2, KeyRound, Package, PlugZap, Plug } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { PAPEIS } from '../../data/constants';
 import RequireAcesso from '../../components/RequireAcesso';
 import GrupoFormModal from './GrupoFormModal';
 import EmpresaFormModal from './EmpresaFormModal';
+
+function BadgeConexao({ conexao }) {
+  if (conexao?.status === 'conectado') {
+    return (
+      <span className="badge bg-gain-50 text-gain-600 dark:bg-gain-700/20 dark:text-gain-400">
+        <PlugZap size={11} /> Conectado
+      </span>
+    );
+  }
+  return (
+    <span className="badge bg-sand-150 text-sand-500 dark:bg-sand-800 dark:text-sand-400">
+      <Plug size={11} /> Não configurado
+    </span>
+  );
+}
 
 export default function GruposEmpresas() {
   const {
@@ -62,7 +77,13 @@ export default function GruposEmpresas() {
                 <div>
                   <h3 className="font-semibold text-sand-900 dark:text-sand-50">{grupo.nome}</h3>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-sand-500 dark:text-sand-400">
-                    <span className="flex items-center gap-1"><KeyRound size={12} /> {grupo.contrato}</span>
+                    {grupo.contrato ? (
+                      <span className="flex items-center gap-1"><KeyRound size={12} /> {grupo.contrato}</span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-amber-500">
+                        <KeyRound size={12} /> Contrato pendente — cadastre uma empresa
+                      </span>
+                    )}
                     <span className="flex items-center gap-1"><Package size={12} /> {grupo.plano}</span>
                   </div>
                 </div>
@@ -85,12 +106,13 @@ export default function GruposEmpresas() {
                 </div>
               ) : (
                 <div className="rounded-lg border border-sand-150 dark:border-sand-800 overflow-hidden overflow-x-auto">
-                  <table className="w-full min-w-[520px]">
+                  <table className="w-full min-w-[660px]">
                     <thead>
                       <tr className="border-b border-sand-150 dark:border-sand-800 bg-sand-50/60 dark:bg-sand-900/40">
                         <th className="text-left text-xs font-semibold uppercase tracking-wider text-sand-400 py-2.5 pl-4 pr-2">Código</th>
                         <th className="text-left text-xs font-semibold uppercase tracking-wider text-sand-400 py-2.5 pr-2">Razão social</th>
                         <th className="text-left text-xs font-semibold uppercase tracking-wider text-sand-400 py-2.5 pr-2">CNPJ</th>
+                        <th className="text-left text-xs font-semibold uppercase tracking-wider text-sand-400 py-2.5 pr-2">Conexão</th>
                         <th className="py-2.5 pr-4" />
                       </tr>
                     </thead>
@@ -100,6 +122,7 @@ export default function GruposEmpresas() {
                           <td className="py-2.5 pl-4 pr-2 text-sm text-sand-600 dark:text-sand-300 tabular-nums">{empresa.codigo}</td>
                           <td className="py-2.5 pr-2 text-sm font-medium text-sand-800 dark:text-sand-100">{empresa.nome}</td>
                           <td className="py-2.5 pr-2 text-sm text-sand-500 dark:text-sand-400">{empresa.cnpj}</td>
+                          <td className="py-2.5 pr-2"><BadgeConexao conexao={empresa.conexao} /></td>
                           <td className="py-2.5 pr-4">
                             <div className="flex items-center justify-end gap-1">
                               <button className="btn-ghost !p-1.5" title="Editar" onClick={() => setModalEmpresa({ grupo, empresa })}>
