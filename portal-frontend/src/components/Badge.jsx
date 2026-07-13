@@ -20,3 +20,24 @@ export function StatusBadge({ status }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.inativo;
   return <span className={`badge ${cfg.className}`}>{cfg.label}</span>;
 }
+
+const SINAL_CONFIG = {
+  '+': { simbolo: '+', titulo: 'Soma no total', className: 'bg-gain-50 text-gain-600 dark:bg-gain-700/20 dark:text-gain-400' },
+  '-': { simbolo: '−', titulo: 'Diminui do total', className: 'bg-loss-50 text-loss-600 dark:bg-loss-700/20 dark:text-loss-400' },
+  '=': { simbolo: '=', titulo: 'Linha de subtotal', className: 'bg-clay-100 text-clay-700 dark:bg-clay-700/20 dark:text-clay-300' },
+};
+
+export function SinalBadge({ sinal, onClick }) {
+  const cfg = SINAL_CONFIG[sinal] ?? SINAL_CONFIG['+'];
+  const Tag = onClick ? 'button' : 'span';
+  return (
+    <Tag
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      title={onClick ? `${cfg.titulo} — clique para alternar` : cfg.titulo}
+      className={`badge !px-0 w-5 h-5 justify-center font-mono font-semibold shrink-0 ${cfg.className} ${onClick ? 'cursor-pointer hover:opacity-75' : ''}`}
+    >
+      {cfg.simbolo}
+    </Tag>
+  );
+}

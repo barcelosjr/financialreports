@@ -9,6 +9,7 @@ import RelatorioDRE from './pages/relatorios/RelatorioDRE';
 import RelatorioBalanco from './pages/relatorios/RelatorioBalanco';
 import RelatorioFluxoCaixa from './pages/relatorios/RelatorioFluxoCaixa';
 import GruposEmpresas from './pages/admin/GruposEmpresas';
+import PlanoContas from './pages/admin/PlanoContas';
 import Usuarios from './pages/admin/Usuarios';
 import Configuracoes from './pages/admin/Configuracoes';
 import Uso from './pages/admin/Uso';
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="relatorios/balanco" element={<RelatorioBalanco />} />
         <Route path="relatorios/fluxo-caixa" element={<RelatorioFluxoCaixa />} />
         <Route path="admin/grupos-empresas" element={<GruposEmpresas />} />
+        <Route path="admin/plano-contas" element={<PlanoContas />} />
         <Route path="admin/usuarios" element={<Usuarios />} />
         <Route path="admin/configuracoes" element={<Configuracoes />} />
         <Route path="admin/uso" element={<Uso />} />

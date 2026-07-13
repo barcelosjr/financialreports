@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Scale, ArrowLeftRight, Users, Settings, Activity, Building2, X,
+  LayoutDashboard, FileText, Scale, ArrowLeftRight, Users, Settings, Activity, Building2, ListTree, X,
 } from 'lucide-react';
 import Logo from './Logo';
 import { useApp } from '../context/AppContext';
@@ -71,6 +71,9 @@ export default function Sidebar({ aberta, onFechar }) {
         <div className="space-y-0.5">
           {ehSuperAdmin && (
             <NavItem to="/app/admin/grupos-empresas" icon={Building2} onClick={onFechar}>Grupos e Empresas</NavItem>
+          )}
+          {podeAdministrarUsuarios && (
+            <NavItem to="/app/admin/plano-contas" icon={ListTree} onClick={onFechar}>Plano de Contas</NavItem>
           )}
           {podeAdministrarUsuarios && (
             <NavItem to="/app/admin/usuarios" icon={Users} onClick={onFechar}>Usuários e acessos</NavItem>

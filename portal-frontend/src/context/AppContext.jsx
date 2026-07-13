@@ -1,7 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { usuarios, usuarioPodeVerEmpresa } from '../data/usuarios';
 import { gruposEconomicos as gruposIniciais } from '../data/empresas';
-import { PAPEIS } from '../data/constants';
+import { PAPEIS, RELATORIOS } from '../data/constants';
+import { gerarEstruturaPadrao } from '../data/estruturaPadrao';
+import { CONTAS_FICTICIAS } from '../data/contasFicticias';
+import { seededRandom } from '../lib/random';
 
 const AppContext = createContext(null);
 
@@ -47,6 +50,71 @@ function gerarChaveContrato(nomeGrupo, chavesExistentes) {
   return chave;
 }
 
+let contadorNo = 0;
+function proximoIdNo() {
+  contadorNo += 1;
+  return `no-${Date.now()}-${contadorNo}`;
+}
+
+function estruturaVaziaPorRelatorio() {
+  return Object.fromEntries(RELATORIOS.map((r) => [r.chave, []]));
+}
+
+function gerarEstruturaCompletaPadrao() {
+  return Object.fromEntries(RELATORIOS.map((r) => [r.chave, gerarEstruturaPadrao(r.chave)]));
+}
+
+function moverNoLista(nos, nodeId, direcao) {
+  const alvo = nos.find((n) => n.id === nodeId);
+  if (!alvo) return nos;
+  const irmaos = nos.filter((n) => n.parentId === alvo.parentId).sort((a, b) => a.ordem - b.ordem);
+  const idx = irmaos.findIndex((n) => n.id === nodeId);
+  const idxTroca = direcao === 'up' ? idx - 1 : idx + 1;
+  if (idxTroca < 0 || idxTroca >= irmaos.length) return nos;
+  const outro = irmaos[idxTroca];
+  return nos.map((n) => {
+    if (n.id === alvo.id) return { ...n, ordem: outro.ordem };
+    if (n.id === outro.id) return { ...n, ordem: alvo.ordem };
+    return n;
+  });
+}
+
+function removerNoComDescendentes(nos, nodeId) {
+  const idsRemover = new Set([nodeId]);
+  let mudou = true;
+  while (mudou) {
+    mudou = false;
+    for (const n of nos) {
+      if (n.parentId && idsRemover.has(n.parentId) && !idsRemover.has(n.id)) {
+        idsRemover.add(n.id);
+        mudou = true;
+      }
+    }
+  }
+  return nos.filter((n) => !idsRemover.has(n.id));
+}
+
+function clonarArvore(nos) {
+  const mapaIds = new Map(nos.map((n) => [n.id, proximoIdNo()]));
+  return nos.map((n) => ({
+    id: mapaIds.get(n.id),
+    nome: n.nome,
+    parentId: n.parentId ? mapaIds.get(n.parentId) : null,
+    ordem: n.ordem,
+    sinal: n.sinal,
+  }));
+}
+
+function estruturasIniciais() {
+  const mapa = {};
+  gruposIniciais.forEach((g) => {
+    g.empresas.forEach((e) => {
+      mapa[e.id] = gerarEstruturaCompletaPadrao();
+    });
+  });
+  return mapa;
+}
+
 export function AppProvider({ children }) {
   const [autenticado, setAutenticado] = useState(false);
   const [usuarioAtualId, setUsuarioAtualId] = useState(usuarios[0].id);
@@ -56,6 +124,9 @@ export function AppProvider({ children }) {
   });
   const [escopo, setEscopo] = useState({ grupoId: null, empresaId: 'todas' });
   const [grupos, setGrupos] = useState(gruposIniciais);
+  const [estruturas, setEstruturas] = useState(estruturasIniciais);
+  const [tagsContas, setTagsContas] = useState({});
+  const [contasPorEmpresa, setContasPorEmpresa] = useState({});
 
   const usuarioAtual = useMemo(
     () => usuarios.find((u) => u.id === usuarioAtualId) ?? usuarios[0],
@@ -114,6 +185,7 @@ export function AppProvider({ children }) {
         return { ...g, contrato, empresas: [...g.empresas, novaEmpresa] };
       })
     );
+    setEstruturas((prev) => ({ ...prev, [novaEmpresa.id]: gerarEstruturaCompletaPadrao() }));
     return novaEmpresa;
   }
 
@@ -131,6 +203,121 @@ export function AppProvider({ children }) {
     setGrupos((prev) =>
       prev.map((g) => (g.id === grupoId ? { ...g, empresas: g.empresas.filter((e) => e.id !== empresaId) } : g))
     );
+    setEstruturas((prev) => {
+      const { [empresaId]: _removida, ...resto } = prev;
+      return resto;
+    });
+  }
+
+  function obterNosEstrutura(empresaId, relatorio) {
+    return estruturas[empresaId]?.[relatorio] ?? [];
+  }
+
+  function atualizarNosRelatorio(empresaId, relatorio, atualizarFn) {
+    setEstruturas((prev) => ({
+      ...prev,
+      [empresaId]: {
+        ...(prev[empresaId] ?? estruturaVaziaPorRelatorio()),
+        [relatorio]: atualizarFn(prev[empresaId]?.[relatorio] ?? []),
+      },
+    }));
+  }
+
+  function adicionarNoEstrutura(empresaId, relatorio, nome, parentId = null, sinal = '+') {
+    atualizarNosRelatorio(empresaId, relatorio, (nos) => {
+      const ordem = nos.filter((n) => n.parentId === parentId).length;
+      return [...nos, { id: proximoIdNo(), nome, parentId, ordem, sinal }];
+    });
+  }
+
+  function renomearNoEstrutura(empresaId, relatorio, nodeId, novoNome) {
+    atualizarNosRelatorio(empresaId, relatorio, (nos) => nos.map((n) => (n.id === nodeId ? { ...n, nome: novoNome } : n)));
+  }
+
+  const PROXIMO_SINAL = { '+': '-', '-': '=', '=': '+' };
+
+  function alterarSinalNoEstrutura(empresaId, relatorio, nodeId, sinal) {
+    atualizarNosRelatorio(empresaId, relatorio, (nos) =>
+      nos.map((n) => (n.id === nodeId ? { ...n, sinal: sinal ?? PROXIMO_SINAL[n.sinal] ?? '+' } : n))
+    );
+  }
+
+  function moverNoEstrutura(empresaId, relatorio, nodeId, direcao) {
+    atualizarNosRelatorio(empresaId, relatorio, (nos) => moverNoLista(nos, nodeId, direcao));
+  }
+
+  function removerNoEstrutura(empresaId, relatorio, nodeId) {
+    atualizarNosRelatorio(empresaId, relatorio, (nos) => removerNoComDescendentes(nos, nodeId));
+  }
+
+  function copiarEstrutura(empresaOrigemId, empresaDestinoId) {
+    setEstruturas((prev) => {
+      const origem = prev[empresaOrigemId] ?? estruturaVaziaPorRelatorio();
+      const copia = Object.fromEntries(RELATORIOS.map((r) => [r.chave, clonarArvore(origem[r.chave] ?? [])]));
+      return { ...prev, [empresaDestinoId]: copia };
+    });
+  }
+
+  // Tags de conta contábil: cada conta pode apontar para um ou mais nós da
+  // estrutura (ex: "3.1.01.001" marcada como DRE > Receita Bruta > Receita
+  // de Vendas), igual ao relatorios.html do portal-backend real.
+  function obterTagsConta(empresaId, conta) {
+    return tagsContas[empresaId]?.[conta] ?? [];
+  }
+
+  function adicionarTagConta(empresaId, conta, tag) {
+    setTagsContas((prev) => {
+      const doEmpresa = prev[empresaId] ?? {};
+      const atuais = doEmpresa[conta] ?? [];
+      if (atuais.some((t) => t.relatorio === tag.relatorio && t.nodeId === tag.nodeId)) return prev;
+      return { ...prev, [empresaId]: { ...doEmpresa, [conta]: [...atuais, tag] } };
+    });
+  }
+
+  function removerTagConta(empresaId, conta, indice) {
+    setTagsContas((prev) => {
+      const doEmpresa = prev[empresaId] ?? {};
+      const atuais = doEmpresa[conta] ?? [];
+      return { ...prev, [empresaId]: { ...doEmpresa, [conta]: atuais.filter((_, i) => i !== indice) } };
+    });
+  }
+
+  // Plano de contas por empresa: só existe depois de "importado". A
+  // importação (100% simulada no frontend — ver README) sorteia, de forma
+  // determinística por empresa, quais contas do catálogo fictício "existiam"
+  // nos lançamentos do último ano, como se tivesse vindo do Power BI.
+  function obterImportacaoContas(empresaId) {
+    return contasPorEmpresa[empresaId] ?? { contas: [], importadoEm: null };
+  }
+
+  function importarContasEmpresa(empresaId) {
+    const importadas = CONTAS_FICTICIAS
+      .filter((c) => seededRandom(`${empresaId}|import|${c.conta}`) < 0.8)
+      .map((c) => ({ ...c, origem: 'importado' }));
+    setContasPorEmpresa((prev) => {
+      // contas adicionadas manualmente não são apagadas por uma (re)importação.
+      const manuais = (prev[empresaId]?.contas ?? []).filter((c) => c.origem === 'manual');
+      const codigosManuais = new Set(manuais.map((c) => c.conta));
+      const contas = [...manuais, ...importadas.filter((c) => !codigosManuais.has(c.conta))];
+      return { ...prev, [empresaId]: { contas, importadoEm: new Date().toISOString() } };
+    });
+  }
+
+  function adicionarContaManual(empresaId, { conta, descricao }) {
+    const contasAtuais = contasPorEmpresa[empresaId]?.contas ?? [];
+    if (contasAtuais.some((c) => c.conta === conta)) return { duplicada: true };
+    setContasPorEmpresa((prev) => {
+      const atual = prev[empresaId] ?? { contas: [], importadoEm: null };
+      return { ...prev, [empresaId]: { ...atual, contas: [...atual.contas, { conta, descricao, origem: 'manual' }] } };
+    });
+    return { duplicada: false };
+  }
+
+  function removerContaManual(empresaId, conta) {
+    setContasPorEmpresa((prev) => {
+      const atual = prev[empresaId] ?? { contas: [], importadoEm: null };
+      return { ...prev, [empresaId]: { ...atual, contas: atual.contas.filter((c) => c.conta !== conta) } };
+    });
   }
 
   const value = {
@@ -151,6 +338,20 @@ export function AppProvider({ children }) {
     adicionarEmpresa,
     atualizarEmpresa,
     removerEmpresa,
+    obterNosEstrutura,
+    adicionarNoEstrutura,
+    renomearNoEstrutura,
+    alterarSinalNoEstrutura,
+    moverNoEstrutura,
+    removerNoEstrutura,
+    copiarEstrutura,
+    obterTagsConta,
+    adicionarTagConta,
+    removerTagConta,
+    obterImportacaoContas,
+    importarContasEmpresa,
+    adicionarContaManual,
+    removerContaManual,
     gruposDoUsuario,
     grupoAtual,
     escopo,

@@ -66,3 +66,8 @@ produto, sem precisar deslogar.
 - Testar de verdade a conexão Power BI configurada por empresa (hoje o
   "Testar conexão" em `EmpresaFormModal` só valida formato de GUID no
   frontend; precisa bater no `portal-backend`/Azure AD de fato).
+- "Importar plano de contas" (aba Plano de Contas) hoje é 100% simulado no
+  frontend — sorteia um subconjunto determinístico de `src/data/contasFicticias.js`
+  por empresa. Precisa virar uma chamada real para `GET
+  /api/contabil/contas?empresa=X` do portal-backend, trazendo as contas
+  únicas de fato usadas no período.

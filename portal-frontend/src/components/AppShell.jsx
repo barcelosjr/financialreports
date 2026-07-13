@@ -11,6 +11,7 @@ const TITULOS_POR_ROTA = [
   { prefixo: '/app/relatorios/balanco', titulo: 'Balanço Patrimonial' },
   { prefixo: '/app/relatorios/fluxo-caixa', titulo: 'Fluxo de Caixa' },
   { prefixo: '/app/admin/grupos-empresas', titulo: 'Grupos e Empresas' },
+  { prefixo: '/app/admin/plano-contas', titulo: 'Plano de Contas' },
   { prefixo: '/app/admin/usuarios', titulo: 'Usuários e acessos' },
   { prefixo: '/app/admin/configuracoes', titulo: 'Configurações' },
   { prefixo: '/app/admin/uso', titulo: 'Uso por usuário' },
