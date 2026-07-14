@@ -1,7 +1,6 @@
 import { FileDown, Sheet } from 'lucide-react';
-import PeriodRangeSelector from './PeriodRangeSelector';
 
-export default function ReportPageHeader({ titulo, subtitulo, periodo, onChangePeriodo, apenasFim = false }) {
+export default function ReportPageHeader({ titulo, subtitulo }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -9,8 +8,6 @@ export default function ReportPageHeader({ titulo, subtitulo, periodo, onChangeP
         <p className="text-sm text-sand-500 dark:text-sand-400">{subtitulo}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <PeriodRangeSelector inicio={periodo.inicio} fim={periodo.fim} onChange={onChangePeriodo} apenasFim={apenasFim} />
-        <div className="h-6 w-px bg-sand-200 dark:bg-sand-700 mx-1" />
         <button className="btn-secondary !px-3 !py-2" disabled title="Exportação será habilitada na integração final">
           <FileDown size={15} /> PDF
         </button>

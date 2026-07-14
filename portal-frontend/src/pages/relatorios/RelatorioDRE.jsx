@@ -1,35 +1,41 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { calcularDREIntervalo } from '../../data/financeiro';
-import { PERIODO_ATUAL, PERIODOS, labelPeriodo } from '../../data/constants';
+import { calcularDRE, construirTabelaPeriodos } from '../../data/financeiro';
+import { PERIODOS, labelPeriodo } from '../../data/constants';
 import { usuarioPodeVerRelatorio } from '../../data/usuarios';
 import ReportPageHeader from '../../components/ReportPageHeader';
 import ReportTree from '../../components/ReportTree';
+import FiltroPeriodoRelatorio from '../../components/FiltroPeriodoRelatorio';
 import RequireAcesso from '../../components/RequireAcesso';
+
+const PERIODOS_INICIAIS = PERIODOS.slice(Math.max(0, PERIODOS.length - 3));
 
 export default function RelatorioDRE() {
   const { usuarioAtual, grupoAtual, empresaIdsEscopo, escopo } = useApp();
-  const [periodo, setPeriodo] = useState({ inicio: PERIODOS[Math.max(0, PERIODOS.length - 3)], fim: PERIODO_ATUAL });
+  const [periodos, setPeriodos] = useState(PERIODOS_INICIAIS);
+  const [opcoes, setOpcoes] = useState({ media: false, ah: false, av: false });
 
   const linhas = useMemo(
-    () => calcularDREIntervalo(empresaIdsEscopo, periodo.inicio, periodo.fim),
-    [empresaIdsEscopo, periodo]
+    () => construirTabelaPeriodos(calcularDRE, empresaIdsEscopo, periodos, { ...opcoes, baseAVId: 'subtotal-receita-liquida' }),
+    [empresaIdsEscopo, periodos, opcoes]
   );
 
   const empresaAtual = grupoAtual?.empresas.find((e) => e.id === escopo.empresaId);
-  const subtitulo = `${escopo.empresaId === 'todas' ? 'Todas as empresas' : empresaAtual?.nome} · ${labelPeriodo(periodo.inicio)} – ${labelPeriodo(periodo.fim)}`;
+  const rotuloPeriodo = periodos.length > 1 ? `${labelPeriodo(periodos[0])} – ${labelPeriodo(periodos[periodos.length - 1])}` : labelPeriodo(periodos[0]);
+  const subtitulo = `${escopo.empresaId === 'todas' ? 'Todas as empresas' : empresaAtual?.nome} · ${rotuloPeriodo}`;
 
   return (
     <RequireAcesso permitido={usuarioPodeVerRelatorio(usuarioAtual, 'dre')}>
-    <div className="space-y-5">
-      <ReportPageHeader
-        titulo="DRE — Demonstrativo do Resultado do Exercício"
-        subtitulo={subtitulo}
-        periodo={periodo}
-        onChangePeriodo={setPeriodo}
-      />
-      <ReportTree linhas={linhas} />
-    </div>
+      <div className="space-y-5">
+        <ReportPageHeader titulo="DRE — Demonstrativo do Resultado do Exercício" subtitulo={subtitulo} />
+        <FiltroPeriodoRelatorio
+          periodosIniciais={PERIODOS_INICIAIS}
+          opcoes={opcoes}
+          onOpcoesChange={setOpcoes}
+          onAplicar={setPeriodos}
+        />
+        <ReportTree linhas={linhas} periodos={periodos} opcoes={opcoes} />
+      </div>
     </RequireAcesso>
   );
 }

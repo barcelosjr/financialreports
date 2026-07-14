@@ -314,16 +314,20 @@ export function calcularFluxoCaixa(empresaIds, periodo) {
 
 // --- Agregação por intervalo de período (periodoInicio/periodoFim) --------
 
-function periodosNoIntervalo(periodoInicio, periodoFim) {
+export function periodosNoIntervalo(periodoInicio, periodoFim) {
   const iIni = PERIODOS.indexOf(periodoInicio);
   const iFim = PERIODOS.indexOf(periodoFim);
   return PERIODOS.slice(iIni, iFim + 1);
 }
 
-export function calcularDREIntervalo(empresaIds, periodoInicio, periodoFim) {
-  const periodos = periodosNoIntervalo(periodoInicio, periodoFim);
-  const listas = empresaIds.flatMap((id) => periodos.map((p) => buildDRE(id, p)));
-  return somarLinhas(listas);
+// Todos os períodos de PERIODOS cujo ano (prefixo "AAAA") bate com o ano
+// informado — usado pelo filtro "Ano" das telas de relatório.
+export function periodosDoAno(ano) {
+  return PERIODOS.filter((p) => p.startsWith(`${ano}-`));
+}
+
+export function anosDisponiveis() {
+  return [...new Set(PERIODOS.map((p) => p.split('-')[0]))];
 }
 
 export function calcularFluxoCaixaIntervalo(empresaIds, periodoInicio, periodoFim) {
@@ -344,6 +348,98 @@ export function calcularFluxoCaixaIntervalo(empresaIds, periodoInicio, periodoFi
     saldoFinal,
     variacaoLiquida: saldoFinal - saldoInicial,
   };
+}
+
+// --- Tabela multi-período (uma coluna por mês, com Média/AH/AV opcionais) --
+//
+// Usada pelas telas de relatório quando o usuário pede "por mês(es)/ano":
+// em vez de somar tudo num único total, devolve, para cada linha, um valor
+// por período selecionado — mais Análise Horizontal (variação vs. o mês
+// anterior na linha do tempo, esteja ele selecionado ou não), Análise
+// Vertical (% sobre uma linha-base, ex: Receita Líquida) e Média do período
+// selecionado, quando pedidos.
+//
+// `calcularFn(empresaIds, periodo)` deve devolver um array de linhas no
+// mesmo formato de calcularDRE/calcularBalanco(...).ativo/etc.
+
+function pctVariacao(atual, anterior) {
+  if (anterior === null || anterior === undefined || anterior === 0) return null;
+  return (atual - anterior) / Math.abs(anterior);
+}
+
+export function construirTabelaPeriodos(calcularFn, empresaIds, periodos, opcoes = {}) {
+  const { media = false, ah = false, av = false, baseAVId = null } = opcoes;
+
+  const periodosNecessarios = new Set(periodos);
+  if (ah) {
+    for (const p of periodos) {
+      const idx = PERIODOS.indexOf(p);
+      if (idx > 0) periodosNecessarios.add(PERIODOS[idx - 1]);
+    }
+  }
+
+  const cache = new Map();
+  for (const p of periodosNecessarios) cache.set(p, calcularFn(empresaIds, p));
+
+  function ahDaLinha(i, contaIdx) {
+    if (!ah) return undefined;
+    return periodos.map((p) => {
+      const idx = PERIODOS.indexOf(p);
+      if (idx <= 0) return null;
+      const anteriorLinhas = cache.get(PERIODOS[idx - 1]);
+      if (!anteriorLinhas) return null;
+      const atualValor = contaIdx == null ? cache.get(p)[i].valor : cache.get(p)[i].contas[contaIdx].valor;
+      const anteriorValor = contaIdx == null ? anteriorLinhas[i].valor : anteriorLinhas[i].contas[contaIdx].valor;
+      return pctVariacao(atualValor, anteriorValor);
+    });
+  }
+
+  function avDaLinha(i, contaIdx) {
+    if (!av || !baseAVId) return undefined;
+    return periodos.map((p) => {
+      const linhasPeriodo = cache.get(p);
+      const base = linhasPeriodo.find((l) => l.id === baseAVId)?.valor;
+      if (!base) return null;
+      const valor = contaIdx == null ? linhasPeriodo[i].valor : linhasPeriodo[i].contas[contaIdx].valor;
+      return valor / base;
+    });
+  }
+
+  function mediaDe(valores) {
+    if (!media) return undefined;
+    return valores.reduce((acc, v) => acc + v, 0) / valores.length;
+  }
+
+  const linhaBase = cache.get(periodos[0]);
+
+  return linhaBase.map((linha, i) => {
+    const valoresPorPeriodo = periodos.map((p) => cache.get(p)[i].valor);
+
+    const contas = linha.contas
+      ? linha.contas.map((conta, j) => {
+          const valoresContaPorPeriodo = periodos.map((p) => cache.get(p)[i].contas[j].valor);
+          return {
+            id: conta.id,
+            nome: conta.nome,
+            valoresPorPeriodo: valoresContaPorPeriodo,
+            ahPorPeriodo: ahDaLinha(i, j),
+            avPorPeriodo: avDaLinha(i, j),
+            media: mediaDe(valoresContaPorPeriodo),
+          };
+        })
+      : undefined;
+
+    return {
+      id: linha.id,
+      nome: linha.nome,
+      tipo: linha.tipo,
+      valoresPorPeriodo,
+      ahPorPeriodo: ahDaLinha(i, null),
+      avPorPeriodo: avDaLinha(i, null),
+      media: mediaDe(valoresPorPeriodo),
+      contas,
+    };
+  });
 }
 
 // --- KPIs e séries para o Dashboard -----------------------------------------
