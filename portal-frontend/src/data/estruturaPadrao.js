@@ -32,6 +32,7 @@ export const ESTRUTURA_PADRAO = {
       { nome: 'Despesas com Pessoal', sinal: '-' },
     ] },
     { nome: 'Resultado Operacional (EBIT)', sinal: '=' },
+    { nome: 'EBITDA', sinal: '=' },
     { nome: 'Resultado Financeiro', sinal: '+', filhos: [
       { nome: 'Receitas Financeiras', sinal: '+' },
       { nome: 'Despesas Financeiras', sinal: '-' },

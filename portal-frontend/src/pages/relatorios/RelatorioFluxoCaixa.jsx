@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { calcularFluxoCaixa, calcularFluxoCaixaIntervalo, construirTabelaPeriodos } from '../../data/financeiro';
+import { calcularRunway } from '../../data/risco';
 import { PERIODOS, labelPeriodo } from '../../data/constants';
 import { usuarioPodeVerRelatorio } from '../../data/usuarios';
 import { formatarMoeda } from '../../lib/format';
@@ -30,11 +31,30 @@ export default function RelatorioFluxoCaixa() {
   const rotuloPeriodo = periodos.length > 1 ? `${labelPeriodo(periodos[0])} – ${labelPeriodo(periodos[periodos.length - 1])}` : labelPeriodo(periodos[0]);
   const subtitulo = `${escopo.empresaId === 'todas' ? 'Todas as empresas' : empresaAtual?.nome} · ${rotuloPeriodo}`;
 
+  const indicadoresFluxo = useMemo(() => {
+    const runway = calcularRunway(empresaIdsEscopo, periodos[periodos.length - 1]);
+    const geracaoCaixa = {
+      label: 'Geração de Caixa Operacional',
+      valor: formatarMoeda(runway.fco, { compacto: true }),
+      status: runway.fco >= 0 ? 'bom' : 'ruim',
+    };
+    if (runway.fco >= 0) return [geracaoCaixa];
+    return [
+      geracaoCaixa,
+      {
+        label: 'Runway de Caixa',
+        valor: `${runway.mesesRunway.toFixed(1)} meses`,
+        status: runway.emRisco ? 'ruim' : 'atencao',
+      },
+    ];
+  }, [empresaIdsEscopo, periodos]);
+
   return (
     <RequireAcesso permitido={usuarioPodeVerRelatorio(usuarioAtual, 'fluxoCaixa')}>
       <div className="space-y-5">
-        <ReportPageHeader titulo="Fluxo de Caixa" subtitulo={subtitulo} />
+        <ReportPageHeader titulo="Fluxo de Caixa" subtitulo={subtitulo} indicadores={indicadoresFluxo} />
         <FiltroPeriodoRelatorio
+          permitirAH={false}
           permitirAV={false}
           periodosIniciais={PERIODOS_INICIAIS}
           opcoes={opcoes}

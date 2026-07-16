@@ -77,6 +77,14 @@ const DRE_BLOCOS = [
     ],
   },
   { id: 'subtotal-ebit', nome: 'Resultado Operacional (EBIT)', tipo: 'subtotal' },
+  // EBITDA não integra o total corrente da DRE (Depreciação/Amortização não é
+  // uma linha de despesa aqui, e sim informada no Fluxo de Caixa) — por isso
+  // usa `ajusteFn`: soma D&A só para exibir esta linha, sem alterar o
+  // `running` que segue para o Resultado Financeiro/LAIR/Lucro Líquido.
+  {
+    id: 'subtotal-ebitda', nome: 'EBITDA', tipo: 'subtotal',
+    ajusteFn: (contaValorFn) => contaValorFn(CONTA_DEPRECIACAO),
+  },
   {
     id: 'resultado-financeiro', nome: 'Resultado Financeiro', sinal: 1, contas: [
       { id: 'receitas-financeiras', nome: 'Receitas Financeiras', faixa: [2000, 6000] },
@@ -101,7 +109,7 @@ const ATIVO_BLOCOS = [
       { id: 'outros-ativos-circ', nome: 'Outros Ativos Circulantes', faixa: [8000, 20000] },
     ],
   },
-  { id: 'subtotal-ativo-circulante', nome: 'Total do Ativo Circulante', tipo: 'subtotal' },
+  { id: 'subtotal-ativo-circulante', nome: 'Total do Ativo Circulante', tipo: 'subtotal', soLinhaAnterior: true },
   {
     id: 'ativo-nao-circulante', nome: 'Ativo Não Circulante', sinal: 1, contas: [
       { id: 'realizavel-lp', nome: 'Realizável a Longo Prazo', faixa: [15000, 35000] },
@@ -109,7 +117,7 @@ const ATIVO_BLOCOS = [
       { id: 'intangivel', nome: 'Intangível', faixa: [10000, 30000] },
     ],
   },
-  { id: 'subtotal-ativo-nao-circulante', nome: 'Total do Ativo Não Circulante', tipo: 'subtotal' },
+  { id: 'subtotal-ativo-nao-circulante', nome: 'Total do Ativo Não Circulante', tipo: 'subtotal', soLinhaAnterior: true },
   { id: 'total-ativo', nome: 'Ativo Total', tipo: 'total' },
 ];
 
@@ -121,13 +129,13 @@ const PASSIVO_PL_BLOCOS = [
       { id: 'obrigacoes-trab-trib', nome: 'Obrigações Trabalhistas e Tributárias', faixa: [30000, 60000] },
     ],
   },
-  { id: 'subtotal-passivo-circulante', nome: 'Total do Passivo Circulante', tipo: 'subtotal' },
+  { id: 'subtotal-passivo-circulante', nome: 'Total do Passivo Circulante', tipo: 'subtotal', soLinhaAnterior: true },
   {
     id: 'passivo-nao-circulante', nome: 'Passivo Não Circulante', sinal: 1, contas: [
       { id: 'emprestimos-lp', nome: 'Empréstimos e Financiamentos (LP)', faixa: [60000, 160000] },
     ],
   },
-  { id: 'subtotal-passivo-nao-circulante', nome: 'Total do Passivo Não Circulante', tipo: 'subtotal' },
+  { id: 'subtotal-passivo-nao-circulante', nome: 'Total do Passivo Não Circulante', tipo: 'subtotal', soLinhaAnterior: true },
   {
     id: 'patrimonio-liquido', nome: 'Patrimônio Líquido', sinal: 1, contas: [
       { id: 'capital-social', nome: 'Capital Social', faixa: [80000, 160000] },
@@ -135,7 +143,7 @@ const PASSIVO_PL_BLOCOS = [
       { id: 'lucros-acumulados', nome: 'Lucros/Prejuízos Acumulados', faixa: null },
     ],
   },
-  { id: 'subtotal-patrimonio-liquido', nome: 'Total do Patrimônio Líquido', tipo: 'subtotal' },
+  { id: 'subtotal-patrimonio-liquido', nome: 'Total do Patrimônio Líquido', tipo: 'subtotal', soLinhaAnterior: true },
   { id: 'total-passivo-pl', nome: 'Passivo + Patrimônio Líquido', tipo: 'total' },
 ];
 
@@ -144,11 +152,16 @@ const PASSIVO_PL_BLOCOS = [
 // "caixa gerado" daquela atividade) e só se somam na linha final. Por isso
 // não há linhas de subtotal entre eles: o próprio valor do bloco já é o
 // número relevante, e "Variação Líquida de Caixa" acumula os três.
+// Conta de D&A compartilhada entre o Fluxo de Caixa (linha real da DEA) e o
+// ajuste de EBITDA na DRE — mesmo `id`/`faixa` garante o mesmo valor seeded
+// (mesma empresa/período) nos dois lugares, sem duplicar a fonte da verdade.
+const CONTA_DEPRECIACAO = { id: 'depreciacao', nome: 'Depreciação e Amortização', faixa: [8000, 16000] };
+
 const FLUXO_BLOCOS_CENTRAL = [
   {
     id: 'atividades-operacionais', nome: 'Atividades Operacionais', sinal: 1, contas: [
       { id: 'lucro-liquido-fc', nome: 'Lucro Líquido do Exercício', faixa: null },
-      { id: 'depreciacao', nome: 'Depreciação e Amortização', faixa: [8000, 16000] },
+      CONTA_DEPRECIACAO,
       { id: 'variacao-capital-giro', nome: 'Variação no Capital de Giro', faixa: [-20000, 15000] },
     ],
   },
@@ -172,10 +185,19 @@ const FLUXO_BLOCOS_CENTRAL = [
 
 function computeLinhas(blocos, contaValorFn) {
   let running = 0;
+  let ultimoBlocoValor = 0;
   const linhas = [];
   for (const bloco of blocos) {
     if (bloco.tipo === 'subtotal' || bloco.tipo === 'total') {
-      linhas.push({ id: bloco.id, nome: bloco.nome, valor: running, tipo: bloco.tipo });
+      const ajuste = bloco.ajusteFn ? bloco.ajusteFn(contaValorFn) : 0;
+      // soLinhaAnterior: usado pelo Balanço, onde cada seção (Ativo Circulante,
+      // Ativo Não Circulante, ...) é independente das demais — "Total da
+      // seção" deve repetir só o bloco imediatamente anterior, não acumular
+      // com seções anteriores (isso só acontece nos totais finais, que usam
+      // `running` corrido de verdade). Sem essa flag (caso do DRE, que É uma
+      // cascata contínua), o subtotal usa o total corrente normalmente.
+      const base = bloco.soLinhaAnterior ? ultimoBlocoValor : running;
+      linhas.push({ id: bloco.id, nome: bloco.nome, valor: base + ajuste, tipo: bloco.tipo });
       continue;
     }
     const contas = bloco.contas.map((c) => ({
@@ -186,6 +208,7 @@ function computeLinhas(blocos, contaValorFn) {
     const somaContas = contas.reduce((acc, c) => acc + c.valor, 0);
     const valorBloco = somaContas * bloco.sinal;
     running += valorBloco;
+    ultimoBlocoValor = valorBloco;
     linhas.push({ id: bloco.id, nome: bloco.nome, valor: valorBloco, tipo: 'bloco', contas });
   }
   return linhas;
@@ -294,6 +317,16 @@ export function calcularDRE(empresaIds, periodo) {
   return somarLinhas(empresaIds.map((id) => buildDRE(id, periodo)));
 }
 
+// Depreciação e Amortização de uma única empresa (mesmo valor da linha do
+// Fluxo de Caixa — ver CONTA_DEPRECIACAO).
+export function depreciacaoAmortizacao(empresaId, periodo) {
+  return fazerContaValorFn(empresaId, periodo)(CONTA_DEPRECIACAO);
+}
+
+export function calcularEBITDA(empresaIds, periodo) {
+  return porId(calcularDRE(empresaIds, periodo), 'subtotal-ebitda').valor;
+}
+
 export function calcularBalanco(empresaIds, periodo) {
   const resultados = empresaIds.map((id) => buildBalanco(id, periodo));
   return {
@@ -328,6 +361,16 @@ export function periodosDoAno(ano) {
 
 export function anosDisponiveis() {
   return [...new Set(PERIODOS.map((p) => p.split('-')[0]))];
+}
+
+// Para cada ano disponível, o período de fechamento (último mês daquele ano
+// dentro de PERIODOS) — usado pelo Balanço, que só faz sentido comparado ano
+// a ano (posição de fechamento), não mês a mês.
+export function periodosFechamentoAnual() {
+  return anosDisponiveis().map((ano) => {
+    const meses = periodosDoAno(ano);
+    return { ano, periodo: meses[meses.length - 1] };
+  });
 }
 
 export function calcularFluxoCaixaIntervalo(empresaIds, periodoInicio, periodoFim) {
@@ -368,10 +411,14 @@ function pctVariacao(atual, anterior) {
 }
 
 export function construirTabelaPeriodos(calcularFn, empresaIds, periodos, opcoes = {}) {
-  const { media = false, ah = false, av = false, baseAVId = null } = opcoes;
+  const { media = false, ah = false, av = false, baseAVId = null, ahVsColunaAnterior = false } = opcoes;
 
+  // AH padrão (DRE/Fluxo) compara cada mês com o mês imediatamente anterior,
+  // esteja ele selecionado ou não — por isso pode precisar carregar um mês a
+  // mais. AH "vs. coluna anterior" (Balanço anual) compara cada coluna com a
+  // coluna anterior da própria seleção, então não precisa de nada extra.
   const periodosNecessarios = new Set(periodos);
-  if (ah) {
+  if (ah && !ahVsColunaAnterior) {
     for (const p of periodos) {
       const idx = PERIODOS.indexOf(p);
       if (idx > 0) periodosNecessarios.add(PERIODOS[idx - 1]);
@@ -381,16 +428,21 @@ export function construirTabelaPeriodos(calcularFn, empresaIds, periodos, opcoes
   const cache = new Map();
   for (const p of periodosNecessarios) cache.set(p, calcularFn(empresaIds, p));
 
+  const valorEm = (periodo, i, contaIdx) =>
+    contaIdx == null ? cache.get(periodo)[i].valor : cache.get(periodo)[i].contas[contaIdx].valor;
+
   function ahDaLinha(i, contaIdx) {
     if (!ah) return undefined;
-    return periodos.map((p) => {
-      const idx = PERIODOS.indexOf(p);
-      if (idx <= 0) return null;
-      const anteriorLinhas = cache.get(PERIODOS[idx - 1]);
-      if (!anteriorLinhas) return null;
-      const atualValor = contaIdx == null ? cache.get(p)[i].valor : cache.get(p)[i].contas[contaIdx].valor;
-      const anteriorValor = contaIdx == null ? anteriorLinhas[i].valor : anteriorLinhas[i].contas[contaIdx].valor;
-      return pctVariacao(atualValor, anteriorValor);
+    return periodos.map((p, k) => {
+      let periodoAnterior;
+      if (ahVsColunaAnterior) {
+        periodoAnterior = k > 0 ? periodos[k - 1] : null;
+      } else {
+        const idx = PERIODOS.indexOf(p);
+        periodoAnterior = idx > 0 ? PERIODOS[idx - 1] : null;
+      }
+      if (!periodoAnterior || !cache.has(periodoAnterior)) return null;
+      return pctVariacao(valorEm(p, i, contaIdx), valorEm(periodoAnterior, i, contaIdx));
     });
   }
 

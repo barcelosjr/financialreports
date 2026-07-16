@@ -1,23 +1,50 @@
-export function formatarMoeda(valor, { compacto = false } = {}) {
-  if (compacto) {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      notation: 'compact',
-      maximumFractionDigits: 0,
-    }).format(valor);
-  }
-  return new Intl.NumberFormat('pt-BR', {
+export function formatarMoeda(valor, { compacto = false, contabil = false } = {}) {
+  const opcoes = {
     style: 'currency',
     currency: 'BRL',
     maximumFractionDigits: 0,
-  }).format(valor);
+    ...(compacto ? { notation: 'compact' } : {}),
+  };
+  // Modo contábil: negativos entre parênteses (ex: "(R$ 1.200)"), em vez de
+  // sinal de menos — convenção de demonstrativos financeiros. O locale
+  // pt-BR não tem um padrão "accounting" no CLDR (currencySign:'accounting'
+  // não tem efeito), então formatamos o valor absoluto e envolvemos manualmente.
+  if (contabil && valor < 0) {
+    return `(${new Intl.NumberFormat('pt-BR', opcoes).format(Math.abs(valor))})`;
+  }
+  return new Intl.NumberFormat('pt-BR', opcoes).format(valor);
+}
+
+// Índice/razão financeira (ex: Liquidez Corrente = 1,25) — 2 casas por
+// padrão, sem símbolo.
+export function formatarIndice(valor, { casasDecimais = 2 } = {}) {
+  if (valor === null || valor === undefined || Number.isNaN(valor)) return '—';
+  return valor.toLocaleString('pt-BR', { minimumFractionDigits: casasDecimais, maximumFractionDigits: casasDecimais });
+}
+
+// Múltiplo (ex: Dívida Líquida/EBITDA = 1,8x).
+export function formatarMultiplo(valor, { casasDecimais = 1 } = {}) {
+  if (valor === null || valor === undefined || Number.isNaN(valor)) return '—';
+  return `${formatarIndice(valor, { casasDecimais })}x`;
+}
+
+// Prazo em dias (ex: PMR = 45 dias).
+export function formatarDias(valor) {
+  if (valor === null || valor === undefined || Number.isNaN(valor)) return '—';
+  return `${Math.round(valor)} dias`;
+}
+
+// Arredonda para string e evita o "-0,0" do JS quando um valor negativo
+// muito pequeno arredonda para zero (ex: ruído de ponto flutuante).
+function paraStringSemZeroNegativo(valor, casasDecimais) {
+  const texto = valor.toFixed(casasDecimais);
+  return Number(texto) === 0 ? Math.abs(Number(texto)).toFixed(casasDecimais) : texto;
 }
 
 export function formatarPercentual(valor, { comSinal = true, casasDecimais = 1 } = {}) {
   if (valor === null || valor === undefined || Number.isNaN(valor)) return '—';
   const sinal = comSinal && valor > 0 ? '+' : '';
-  return `${sinal}${(valor * 100).toFixed(casasDecimais)}%`;
+  return `${sinal}${paraStringSemZeroNegativo(valor * 100, casasDecimais)}%`;
 }
 
 // Variação de um indicador que já é, ele mesmo, um percentual (ex: Margem
@@ -26,7 +53,7 @@ export function formatarPercentual(valor, { comSinal = true, casasDecimais = 1 }
 export function formatarPontosPercentuais(valor, { comSinal = true, casasDecimais = 1 } = {}) {
   if (valor === null || valor === undefined || Number.isNaN(valor)) return '—';
   const sinal = comSinal && valor > 0 ? '+' : '';
-  return `${sinal}${(valor * 100).toFixed(casasDecimais)} p.p.`;
+  return `${sinal}${paraStringSemZeroNegativo(valor * 100, casasDecimais)} p.p.`;
 }
 
 export function formatarDataHora(isoString) {

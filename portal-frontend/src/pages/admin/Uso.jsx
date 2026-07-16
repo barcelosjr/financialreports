@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext';
 import { usuarios } from '../../data/usuarios';
 import { PAPEIS } from '../../data/constants';
 import { formatarDataRelativa } from '../../lib/format';
+import { useChartTheme } from '../../lib/chartTheme';
 import { PapelBadge, StatusBadge } from '../../components/Badge';
 import RequireAcesso from '../../components/RequireAcesso';
 
@@ -19,15 +20,12 @@ function TooltipCard({ active, payload, label }) {
 }
 
 export default function Uso() {
-  const { usuarioAtual, tema, grupos, grupoPorId } = useApp();
+  const { usuarioAtual, grupos, grupoPorId } = useApp();
   const ehSuperAdmin = usuarioAtual.papel === PAPEIS.SUPER_ADMIN;
   const podeAdministrar = usuarioAtual.papel !== PAPEIS.USUARIO;
   const [filtroGrupo, setFiltroGrupo] = useState('todos');
 
-  const isDark = tema === 'dark';
-  const corGrade = isDark ? '#3B3730' : '#E5E1D6';
-  const corEixo = isDark ? '#B0A891' : '#8B8371';
-  const corCursor = isDark ? '#262421' : '#F4F3EE';
+  const { corGrade, corEixo, corCursor } = useChartTheme();
 
   const base = ehSuperAdmin ? usuarios : usuarios.filter((u) => u.grupoId === usuarioAtual.grupoId);
   const lista = ehSuperAdmin && filtroGrupo !== 'todos' ? base.filter((u) => u.grupoId === filtroGrupo) : base;

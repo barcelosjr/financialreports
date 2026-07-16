@@ -8,6 +8,10 @@ import Dashboard from './pages/dashboard/Dashboard';
 import RelatorioDRE from './pages/relatorios/RelatorioDRE';
 import RelatorioBalanco from './pages/relatorios/RelatorioBalanco';
 import RelatorioFluxoCaixa from './pages/relatorios/RelatorioFluxoCaixa';
+import Indicadores from './pages/analises/Indicadores';
+import AnaliseRisco from './pages/analises/AnaliseRisco';
+import Previsao from './pages/analises/Previsao';
+import OrcadoRealizado from './pages/analises/OrcadoRealizado';
 import GruposEmpresas from './pages/admin/GruposEmpresas';
 import PlanoContas from './pages/admin/PlanoContas';
 import Usuarios from './pages/admin/Usuarios';
@@ -29,6 +33,10 @@ export default function App() {
         <Route path="relatorios/dre" element={<RelatorioDRE />} />
         <Route path="relatorios/balanco" element={<RelatorioBalanco />} />
         <Route path="relatorios/fluxo-caixa" element={<RelatorioFluxoCaixa />} />
+        <Route path="analises/indicadores" element={<Indicadores />} />
+        <Route path="analises/risco" element={<AnaliseRisco />} />
+        <Route path="analises/previsao" element={<Previsao />} />
+        <Route path="analises/orcado-realizado" element={<OrcadoRealizado />} />
         <Route path="admin/grupos-empresas" element={<GruposEmpresas />} />
         <Route path="admin/plano-contas" element={<PlanoContas />} />
         <Route path="admin/usuarios" element={<Usuarios />} />

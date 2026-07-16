@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Scale, ArrowLeftRight, Users, Settings, Activity, Building2, ListTree, X,
+  Gauge, ShieldAlert, TrendingUp, SplitSquareHorizontal,
 } from 'lucide-react';
 import Logo from './Logo';
 import { useApp } from '../context/AppContext';
@@ -64,6 +65,22 @@ export default function Sidebar({ aberta, onFechar }) {
           )}
           {usuarioPodeVerRelatorio(usuarioAtual, 'fluxoCaixa') && (
             <NavItem to="/app/relatorios/fluxo-caixa" icon={ArrowLeftRight} onClick={onFechar}>Fluxo de Caixa</NavItem>
+          )}
+        </div>
+
+        <SectionLabel>Análises</SectionLabel>
+        <div className="space-y-0.5">
+          {usuarioPodeVerRelatorio(usuarioAtual, 'dre') && usuarioPodeVerRelatorio(usuarioAtual, 'balanco') && (
+            <>
+              <NavItem to="/app/analises/indicadores" icon={Gauge} onClick={onFechar}>Indicadores</NavItem>
+              <NavItem to="/app/analises/risco" icon={ShieldAlert} onClick={onFechar}>Análise de Risco</NavItem>
+            </>
+          )}
+          {usuarioPodeVerRelatorio(usuarioAtual, 'dre') && usuarioPodeVerRelatorio(usuarioAtual, 'fluxoCaixa') && (
+            <NavItem to="/app/analises/previsao" icon={TrendingUp} onClick={onFechar}>Previsão</NavItem>
+          )}
+          {usuarioPodeVerRelatorio(usuarioAtual, 'dre') && (
+            <NavItem to="/app/analises/orcado-realizado" icon={SplitSquareHorizontal} onClick={onFechar}>Orçado × Realizado</NavItem>
           )}
         </div>
 
