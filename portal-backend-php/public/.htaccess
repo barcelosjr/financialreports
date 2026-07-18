@@ -1,0 +1,11 @@
+# Front controller unico: tudo que nao for um arquivo existente cai no
+# index.php, que roteia via src/Router.php.
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [QSA,L]
+
+# Nunca servir config.php nem nada fora de public/ (defesa extra -- em
+# producao config.php ja fica fora do web root, ver PLANO.md "Deploy").
+<Files "config.php">
+    Require all denied
+</Files>

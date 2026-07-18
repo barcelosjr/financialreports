@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "portal-backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "portal-backend", "start"],
+      "port": 3000
+    },
+    {
+      "name": "portal-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "portal-frontend", "run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "portal-backend-php",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["-S", "localhost:8000", "-t", "portal-backend-php/public", "portal-backend-php/public/router.php"],
+      "port": 8000
+    }
+  ]
+}

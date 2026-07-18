@@ -1,0 +1,47 @@
+<?php
+// Copie este arquivo para "config.php" (mesma pasta) e preencha com valores
+// reais. O config.php NUNCA deve ser commitado (ja esta no .gitignore) nem
+// ficar dentro de public_html/ em producao -- ver secao "Deploy" do PLANO.md.
+
+return [
+    // Conexao MySQL (substitui os arquivos JSON do backend Node).
+    'DB' => [
+        'host' => '127.0.0.1',
+        'port' => 3306,
+        'dbname' => 'portal_financeiro',
+        'user' => 'root',
+        'pass' => '',
+    ],
+
+    // Espelha o clients.json do Node: API key -> cliente + empresas
+    // autorizadas. Na Fase 2 isso migra para a tabela `usuarios`/`grupos`.
+    'CLIENTS' => [
+        'troque-por-uma-chave-aleatoria-longa' => [
+            'cliente' => 'Grupo Economico X',
+            'empresas' => ['001', '002'],
+        ],
+    ],
+
+    // Quando true, /api/contabil/contas usa src/MockData.php em vez de
+    // consultar o Power BI de verdade (mesmo espirito do MOCK_MODE do Node).
+    'MOCK_MODE' => true,
+
+    // Credenciais Azure AD / Power BI -- so usadas quando MOCK_MODE=false
+    // (Fase 3 em diante).
+    'AZURE' => [
+        'tenant_id' => '',
+        'client_id' => '',
+        'client_secret' => '',
+        'group_id' => '',
+        'dataset_id' => '',
+    ],
+
+    // TTL do cache (segundos) de queries DAX / token Azure, persistido na
+    // tabela `cache` (sem processo em memoria em shared hosting).
+    'CACHE_TTL_SECONDS' => 600,
+
+    // Origem(ns) permitidas para CORS, separadas por virgula. Deixe vazio em
+    // producao (mesma origem, sem CORS) e em dev (o proxy do Vite ja evita
+    // CORS). Use "*" so se precisar testar sem o proxy.
+    'CORS_ORIGIN' => '',
+];

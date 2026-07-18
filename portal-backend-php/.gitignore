@@ -1,0 +1,8 @@
+vendor/
+config.php
+.env
+*.log
+tools/*.phar
+.phpunit.cache/
+*.txt
+*.tmp

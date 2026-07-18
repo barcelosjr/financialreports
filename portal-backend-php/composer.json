@@ -1,0 +1,15 @@
+{
+    "name": "financialreports/portal-backend-php",
+    "description": "Backend PHP do portal financeiro (Hostinger) -- espelha portal-backend (Node) rota a rota.",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "ext-pdo": "*",
+        "ext-curl": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    }
+}
