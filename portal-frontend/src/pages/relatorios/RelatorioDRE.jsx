@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { calcularDRE, construirTabelaPeriodos } from '../../data/financeiro';
 import { todosIndicadores } from '../../data/indicadores';
 import { PERIODOS, labelPeriodo } from '../../data/constants';
 import { usuarioPodeVerRelatorio } from '../../data/usuarios';
 import { formatarPercentual } from '../../lib/format';
+import { usePersistedState } from '../../lib/usePersistedState';
 import ReportPageHeader from '../../components/ReportPageHeader';
 import ReportTree from '../../components/ReportTree';
 import FiltroPeriodoRelatorio from '../../components/FiltroPeriodoRelatorio';
@@ -14,8 +15,8 @@ const PERIODOS_INICIAIS = PERIODOS.slice(Math.max(0, PERIODOS.length - 3));
 
 export default function RelatorioDRE() {
   const { usuarioAtual, grupoAtual, empresaIdsEscopo, escopo } = useApp();
-  const [periodos, setPeriodos] = useState(PERIODOS_INICIAIS);
-  const [opcoes, setOpcoes] = useState({ media: false, ah: false, av: false });
+  const [periodos, setPeriodos] = usePersistedState('fr-dre-periodos', PERIODOS_INICIAIS);
+  const [opcoes, setOpcoes] = usePersistedState('fr-dre-opcoes', { media: false, ah: false, av: false, total: false });
 
   const linhas = useMemo(
     () => construirTabelaPeriodos(calcularDRE, empresaIdsEscopo, periodos, { ...opcoes, baseAVId: 'subtotal-receita-liquida' }),
@@ -41,6 +42,7 @@ export default function RelatorioDRE() {
       <div className="space-y-5">
         <ReportPageHeader titulo="DRE — Demonstrativo do Resultado do Exercício" subtitulo={subtitulo} indicadores={indicadoresMargem} />
         <FiltroPeriodoRelatorio
+          permitirTotal
           periodosIniciais={PERIODOS_INICIAIS}
           opcoes={opcoes}
           onOpcoesChange={setOpcoes}

@@ -90,4 +90,23 @@ describe('construirTabelaPeriodos — AH/AV', () => {
     const base = linhas.find((l) => l.id === 'subtotal-receita-liquida');
     expect(base.avPorPeriodo[0]).toBeCloseTo(1, 6);
   });
+
+  it('total soma os valores do período selecionado (linha e contas)', () => {
+    const periodos = PERIODOS.slice(-3);
+    const linhas = construirTabelaPeriodos(calcularDRE, [EMPRESA], periodos, { total: true });
+    const linha = linhas.find((l) => l.id === 'subtotal-receita-liquida');
+    const somaManual = linha.valoresPorPeriodo.reduce((acc, v) => acc + v, 0);
+    expect(linha.total).toBeCloseTo(somaManual, 6);
+
+    const blocoComContas = linhas.find((l) => l.id === 'receita-bruta');
+    const conta = blocoComContas.contas[0];
+    const somaContaManual = conta.valoresPorPeriodo.reduce((acc, v) => acc + v, 0);
+    expect(conta.total).toBeCloseTo(somaContaManual, 6);
+  });
+
+  it('total fica undefined quando não solicitado', () => {
+    const linhas = construirTabelaPeriodos(calcularDRE, [EMPRESA], [PERIODO], {});
+    const linha = linhas.find((l) => l.id === 'subtotal-receita-liquida');
+    expect(linha.total).toBeUndefined();
+  });
 });

@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { calcularFluxoCaixa, calcularFluxoCaixaIntervalo, construirTabelaPeriodos } from '../../data/financeiro';
 import { calcularRunway } from '../../data/risco';
 import { PERIODOS, labelPeriodo } from '../../data/constants';
 import { usuarioPodeVerRelatorio } from '../../data/usuarios';
 import { formatarMoeda } from '../../lib/format';
+import { usePersistedState } from '../../lib/usePersistedState';
 import ReportPageHeader from '../../components/ReportPageHeader';
 import ReportTree from '../../components/ReportTree';
 import FiltroPeriodoRelatorio from '../../components/FiltroPeriodoRelatorio';
@@ -14,8 +15,8 @@ const PERIODOS_INICIAIS = PERIODOS.slice(Math.max(0, PERIODOS.length - 3));
 
 export default function RelatorioFluxoCaixa() {
   const { usuarioAtual, grupoAtual, empresaIdsEscopo, escopo } = useApp();
-  const [periodos, setPeriodos] = useState(PERIODOS_INICIAIS);
-  const [opcoes, setOpcoes] = useState({ media: false, ah: false, av: false });
+  const [periodos, setPeriodos] = usePersistedState('fr-fluxocaixa-periodos', PERIODOS_INICIAIS);
+  const [opcoes, setOpcoes] = usePersistedState('fr-fluxocaixa-opcoes', { media: false, ah: false, av: false, total: false });
 
   const resumo = useMemo(
     () => calcularFluxoCaixaIntervalo(empresaIdsEscopo, periodos[0], periodos[periodos.length - 1]),
@@ -56,6 +57,7 @@ export default function RelatorioFluxoCaixa() {
         <FiltroPeriodoRelatorio
           permitirAH={false}
           permitirAV={false}
+          permitirTotal
           periodosIniciais={PERIODOS_INICIAIS}
           opcoes={opcoes}
           onOpcoesChange={setOpcoes}

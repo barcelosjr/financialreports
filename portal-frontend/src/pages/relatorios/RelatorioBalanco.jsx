@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { calcularBalanco, construirTabelaPeriodos, periodosFechamentoAnual, porId } from '../../data/financeiro';
 import { todosIndicadores } from '../../data/indicadores';
 import { usuarioPodeVerRelatorio } from '../../data/usuarios';
 import { formatarMoeda, formatarMultiplo, formatarPercentual } from '../../lib/format';
+import { usePersistedState } from '../../lib/usePersistedState';
 import ReportPageHeader from '../../components/ReportPageHeader';
 import ReportTree from '../../components/ReportTree';
 import FiltroPeriodoRelatorio from '../../components/FiltroPeriodoRelatorio';
@@ -19,11 +20,12 @@ const ROTULOS_INICIAIS = [ANO_ATUAL.ano];
 
 export default function RelatorioBalanco() {
   const { usuarioAtual, grupoAtual, empresaIdsEscopo, escopo } = useApp();
-  const [periodos, setPeriodos] = useState(PERIODOS_INICIAIS);
-  const [rotulos, setRotulos] = useState(ROTULOS_INICIAIS);
-  // Balanço não oferece Análise Vertical (só a DRE tem, sobre a Receita Líquida).
-  const [opcoes, setOpcoes] = useState({ media: false, ah: false, av: false });
-  const opcoesBalanco = { ...opcoes, av: false, ahVsColunaAnterior: true };
+  const [periodos, setPeriodos] = usePersistedState('fr-balanco-periodos', PERIODOS_INICIAIS);
+  const [rotulos, setRotulos] = usePersistedState('fr-balanco-rotulos', ROTULOS_INICIAIS);
+  // Balanço só oferece Análise Horizontal (nem Média, nem Análise Vertical —
+  // essa última só faz sentido na DRE, sobre a Receita Líquida).
+  const [opcoes, setOpcoes] = usePersistedState('fr-balanco-opcoes', { media: false, ah: false, av: false, total: false });
+  const opcoesBalanco = { ...opcoes, media: false, av: false, total: false, ahVsColunaAnterior: true };
 
   const ativo = useMemo(
     () => construirTabelaPeriodos((ids, p) => calcularBalanco(ids, p).ativo, empresaIdsEscopo, periodos, opcoesBalanco),
@@ -75,6 +77,7 @@ export default function RelatorioBalanco() {
         <FiltroPeriodoRelatorio
           modo="anualComparativo"
           permitirAV={false}
+          permitirMedia={false}
           periodosIniciais={PERIODOS_INICIAIS}
           opcoes={opcoes}
           onOpcoesChange={setOpcoes}

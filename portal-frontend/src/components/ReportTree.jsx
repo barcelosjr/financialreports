@@ -20,7 +20,7 @@ function corValor(valor, tipo) {
   return 'text-sand-800 dark:text-sand-100';
 }
 
-function celulasPorPeriodo({ valoresPorPeriodo, ahPorPeriodo, avPorPeriodo, media, tipo, opcoes, negrito, bg }) {
+function celulasPorPeriodo({ valoresPorPeriodo, ahPorPeriodo, avPorPeriodo, media, total, tipo, opcoes, negrito, bg }) {
   const celulas = valoresPorPeriodo.flatMap((v, k) => {
     const grupo = [
       <td
@@ -58,6 +58,17 @@ function celulasPorPeriodo({ valoresPorPeriodo, ahPorPeriodo, avPorPeriodo, medi
         className={`py-2.5 pr-3 pl-3 text-right text-sm tabular-nums whitespace-nowrap ${bg} ${negrito ? 'font-medium' : ''} border-l-2 border-sand-200 dark:border-sand-700 ${corValor(media, tipo)}`}
       >
         {formatarMoeda(media)}
+      </td>
+    );
+  }
+
+  if (opcoes.total) {
+    celulas.push(
+      <td
+        key="total"
+        className={`py-2.5 pr-3 pl-3 text-right text-sm tabular-nums whitespace-nowrap ${bg} ${negrito ? 'font-medium' : ''} border-l-2 border-sand-200 dark:border-sand-700 ${corValor(total, tipo)}`}
+      >
+        {formatarMoeda(total)}
       </td>
     );
   }
@@ -112,7 +123,7 @@ function LinhaSubtotal({ linha, opcoes }) {
   );
 }
 
-export default function ReportTree({ linhas, periodos, rotulos = null, opcoes = { media: false, ah: false, av: false }, colunaNome = 'Conta' }) {
+export default function ReportTree({ linhas, periodos, rotulos = null, opcoes = { media: false, ah: false, av: false, total: false }, colunaNome = 'Conta' }) {
   const [expandidos, setExpandidos] = useState(() => new Set(linhas.filter((l) => l.tipo === 'bloco').map((l) => l.id)));
 
   const rotuloDe = (k) => rotulos?.[k] ?? labelPeriodo(periodos[k]);
@@ -164,6 +175,7 @@ export default function ReportTree({ linhas, periodos, rotulos = null, opcoes = 
                   </th>
                 ))}
                 {opcoes.media && <th rowSpan={2} className="text-right text-xs font-semibold uppercase tracking-wider text-sand-400 py-3 pr-3 align-bottom border-l-2 border-sand-200 dark:border-sand-700">Média</th>}
+                {opcoes.total && <th rowSpan={2} className="text-right text-xs font-semibold uppercase tracking-wider text-sand-400 py-3 pr-3 align-bottom border-l-2 border-sand-200 dark:border-sand-700">Total</th>}
               </tr>
               <tr>
                 {periodos.map((p) => (
@@ -187,6 +199,7 @@ export default function ReportTree({ linhas, periodos, rotulos = null, opcoes = 
                 </th>
               ))}
               {opcoes.media && <th className="text-right text-xs font-semibold uppercase tracking-wider text-sand-400 py-3 pr-3 border-l-2 border-sand-200 dark:border-sand-700">Média</th>}
+              {opcoes.total && <th className="text-right text-xs font-semibold uppercase tracking-wider text-sand-400 py-3 pr-3 border-l-2 border-sand-200 dark:border-sand-700">Total</th>}
             </tr>
           )}
         </thead>

@@ -16,6 +16,8 @@ export default function FiltroPeriodoRelatorio({
   modo = 'padrao',
   permitirAH = true,
   permitirAV = true,
+  permitirMedia = true,
+  permitirTotal = false,
   periodosIniciais,
   opcoes,
   onOpcoesChange,
@@ -156,10 +158,18 @@ export default function FiltroPeriodoRelatorio({
       </div>
 
       <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-sand-150 dark:border-sand-800">
-        <label className="flex items-center gap-1.5 text-sm text-sand-600 dark:text-sand-300 cursor-pointer">
-          <input type="checkbox" className="accent-clay-500" checked={opcoes.media} onChange={() => toggleOpcao('media')} />
-          Média do período
-        </label>
+        {permitirMedia && (
+          <label className="flex items-center gap-1.5 text-sm text-sand-600 dark:text-sand-300 cursor-pointer">
+            <input type="checkbox" className="accent-clay-500" checked={opcoes.media} onChange={() => toggleOpcao('media')} />
+            Média do período
+          </label>
+        )}
+        {permitirTotal && (
+          <label className="flex items-center gap-1.5 text-sm text-sand-600 dark:text-sand-300 cursor-pointer">
+            <input type="checkbox" className="accent-clay-500" checked={opcoes.total} onChange={() => toggleOpcao('total')} />
+            Total do Período
+          </label>
+        )}
         {permitirAH && (
           <label className="flex items-center gap-1.5 text-sm text-sand-600 dark:text-sand-300 cursor-pointer">
             <input type="checkbox" className="accent-clay-500" checked={opcoes.ah} onChange={() => toggleOpcao('ah')} />

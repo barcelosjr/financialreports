@@ -411,7 +411,7 @@ function pctVariacao(atual, anterior) {
 }
 
 export function construirTabelaPeriodos(calcularFn, empresaIds, periodos, opcoes = {}) {
-  const { media = false, ah = false, av = false, baseAVId = null, ahVsColunaAnterior = false } = opcoes;
+  const { media = false, ah = false, av = false, total = false, baseAVId = null, ahVsColunaAnterior = false } = opcoes;
 
   // AH padrão (DRE/Fluxo) compara cada mês com o mês imediatamente anterior,
   // esteja ele selecionado ou não — por isso pode precisar carregar um mês a
@@ -462,6 +462,11 @@ export function construirTabelaPeriodos(calcularFn, empresaIds, periodos, opcoes
     return valores.reduce((acc, v) => acc + v, 0) / valores.length;
   }
 
+  function totalDe(valores) {
+    if (!total) return undefined;
+    return valores.reduce((acc, v) => acc + v, 0);
+  }
+
   const linhaBase = cache.get(periodos[0]);
 
   return linhaBase.map((linha, i) => {
@@ -477,6 +482,7 @@ export function construirTabelaPeriodos(calcularFn, empresaIds, periodos, opcoes
             ahPorPeriodo: ahDaLinha(i, j),
             avPorPeriodo: avDaLinha(i, j),
             media: mediaDe(valoresContaPorPeriodo),
+            total: totalDe(valoresContaPorPeriodo),
           };
         })
       : undefined;
@@ -489,6 +495,7 @@ export function construirTabelaPeriodos(calcularFn, empresaIds, periodos, opcoes
       ahPorPeriodo: ahDaLinha(i, null),
       avPorPeriodo: avDaLinha(i, null),
       media: mediaDe(valoresPorPeriodo),
+      total: totalDe(valoresPorPeriodo),
       contas,
     };
   });
