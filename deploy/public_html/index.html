@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smoke test — financialreports.com.br</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  h1 { font-size: 1.25rem; }
+  section { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+  h2 { font-size: 1rem; margin-top: 0; }
+  button { padding: 0.5rem 1rem; cursor: pointer; }
+  input { padding: 0.4rem; width: 100%; box-sizing: border-box; margin-bottom: 0.5rem; }
+  pre { background: #f5f5f5; padding: 0.75rem; border-radius: 6px; white-space: pre-wrap; word-break: break-word; min-height: 1.2em; }
+  label { display: block; font-size: 0.85rem; color: #555; margin-bottom: 0.25rem; }
+</style>
+</head>
+<body>
+  <h1>Smoke test — financialreports.com.br</h1>
+  <p>Página estática só para provar o ambiente (PHP + MySQL + .htaccess) antes do deploy real da SPA. Pode apagar depois.</p>
+
+  <section>
+    <h2>1. GET /api/health (sem auth)</h2>
+    <button id="btnHealth">Testar</button>
+    <pre id="outHealth"></pre>
+  </section>
+
+  <section>
+    <h2>2. Criar um nó de teste (grava no MySQL)</h2>
+    <label for="apiKey">X-API-KEY (a mesma que você colocou em CLIENTS no config.php)</label>
+    <input id="apiKey" placeholder="troque-por-uma-chave-aleatoria-longa">
+    <button id="btnCriar">POST /api/contabil/estrutura — cria "Smoke Test" em DRE / empresa 001</button>
+    <pre id="outCriar"></pre>
+  </section>
+
+  <section>
+    <h2>3. Ler a estrutura de volta</h2>
+    <button id="btnLer">GET /api/contabil/estrutura?empresa=001&amp;relatorio=dre</button>
+    <pre id="outLer"></pre>
+  </section>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    async function chamar(url, opts, outEl) {
+      outEl.textContent = 'Chamando...';
+      try {
+        const res = await fetch(url, opts);
+        const texto = await res.text();
+        outEl.textContent = 'HTTP ' + res.status + '\n' + texto;
+      } catch (e) {
+        outEl.textContent = 'Erro de rede: ' + e.message;
+      }
+    }
+
+    $('btnHealth').addEventListener('click', () => {
+      chamar('/api/health', {}, $('outHealth'));
+    });
+
+    $('btnCriar').addEventListener('click', () => {
+      chamar('/api/contabil/estrutura?empresa=001', {
+        method: 'POST',
+        headers: { 'X-API-KEY': $('apiKey').value, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ relatorio: 'dre', nome: 'Smoke Test' }),
+      }, $('outCriar'));
+    });
+
+    $('btnLer').addEventListener('click', () => {
+      chamar('/api/contabil/estrutura?empresa=001&relatorio=dre', {
+        headers: { 'X-API-KEY': $('apiKey').value },
+      }, $('outLer'));
+    });
+  </script>
+</body>
+</html>

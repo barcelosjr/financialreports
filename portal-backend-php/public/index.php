@@ -1,7 +1,15 @@
 <?php
 declare(strict_types=1);
 
-require __DIR__ . '/../src/autoload.php';
+// Em dev local, src/ e config.php ficam ao lado de public/ (um nível acima
+// deste arquivo). Em produção na Hostinger, o front controller mora em
+// public_html/api/ mas src/+config.php ficam FORA do web root (ver
+// deploy/GUIA_SMOKE_DEPLOY.md) -- nesse caso, api/.htaccess define
+// `SetEnv APP_BASE_PATH /caminho/para/app` e este arquivo usa esse caminho
+// em vez do padrão relativo.
+$basePath = getenv('APP_BASE_PATH') ?: (__DIR__ . '/..');
+
+require $basePath . '/src/autoload.php';
 
 use App\Http;
 use App\Router;
@@ -10,7 +18,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 // Em testes de integração, APP_CONFIG_PATH aponta pro config.test.php (banco
 // e API key dedicados) sem tocar no config.php de dev.
-$configPath = getenv('APP_CONFIG_PATH') ?: __DIR__ . '/../config.php';
+$configPath = getenv('APP_CONFIG_PATH') ?: ($basePath . '/config.php');
 if (!file_exists($configPath)) {
     Http::sendError(500, 'config.php não encontrado. Copie config.php.example para config.php e preencha.');
     exit;
@@ -29,7 +37,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 }
 
 $router = new Router();
-require __DIR__ . '/../src/routes.php'; // popula $router usando $config
+require $basePath . '/src/routes.php'; // popula $router usando $config
 
 // O front controller mora em public_html/api/ em producao (mesma origem);
 // o REQUEST_URI chega com o prefixo /api tanto em producao (pasta real)

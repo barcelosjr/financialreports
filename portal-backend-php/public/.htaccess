@@ -1,3 +1,8 @@
+# Em producao (ver deploy/GUIA_SMOKE_DEPLOY.md), src/ e config.php ficam fora
+# do web root -- descomente e ajuste o caminho abaixo. Em dev local (php -S)
+# nao precisa: index.php cai no padrao (um nivel acima deste arquivo).
+# SetEnv APP_BASE_PATH /home/SEU_USUARIO/domains/financialreports.com.br/app
+
 # Front controller unico: tudo que nao for um arquivo existente cai no
 # index.php, que roteia via src/Router.php.
 RewriteEngine On

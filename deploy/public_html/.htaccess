@@ -1,0 +1,14 @@
+# Fallback de SPA para public_html/ -- qualquer caminho que não seja um
+# arquivo/diretório real e não comece com /api/ cai no index.html (necessário
+# quando a SPA de verdade (React Router) for publicada aqui; a página estática
+# do smoke test nem usa isso, mas já deixa pronto pro deploy real).
+#
+# A exclusão explícita de /api/ é de propósito -- sem ela, um Apache/LiteSpeed
+# que reprocesse esta regra para subcaminhos poderia engolir as chamadas de
+# API e devolver o index.html em vez de deixar public_html/api/.htaccess
+# (o front controller do PHP) responder.
+RewriteEngine On
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [QSA,L]
