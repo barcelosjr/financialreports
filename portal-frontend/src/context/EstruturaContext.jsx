@@ -99,17 +99,30 @@ export function EstruturaProvider({ children }) {
 
   // Tags de conta contábil: cada conta pode apontar para um ou mais nós da
   // estrutura (ex: "3.1.01.001" marcada como DRE > Receita Bruta > Receita
-  // de Vendas), igual ao relatorios.html do portal-backend real.
+  // de Vendas), igual ao relatorios.html do portal-backend real. `centroCusto`
+  // e `natureza` são opcionais: sem eles, a tag vale pra conta inteira; com
+  // eles, só se aplica aos lançamentos daquele centro de custo e/ou natureza
+  // (D/C) — permite que uma mesma conta (ex: "Receita") aponte pra grupos
+  // diferentes por centro de custo (ex: CC 100 -> Receita de Veículos Novos,
+  // CC 200 -> Receita de Veículos Usados) e/ou por natureza.
   function obterTagsConta(empresaId, conta) {
     return tagsContas[empresaId]?.[conta] ?? [];
   }
 
   function adicionarTagConta(empresaId, conta, tag) {
+    const centroCusto = tag.centroCusto?.trim() || null;
+    const naturezaNormalizada = tag.natureza?.trim().toUpperCase();
+    const natureza = naturezaNormalizada === 'D' || naturezaNormalizada === 'C' ? naturezaNormalizada : null;
     setTagsContas((prev) => {
       const doEmpresa = prev[empresaId] ?? {};
       const atuais = doEmpresa[conta] ?? [];
-      if (atuais.some((t) => t.relatorio === tag.relatorio && t.nodeId === tag.nodeId)) return prev;
-      return { ...prev, [empresaId]: { ...doEmpresa, [conta]: [...atuais, tag] } };
+      const igual = (t) =>
+        t.relatorio === tag.relatorio &&
+        t.nodeId === tag.nodeId &&
+        (t.centroCusto ?? null) === centroCusto &&
+        (t.natureza ?? null) === natureza;
+      if (atuais.some(igual)) return prev;
+      return { ...prev, [empresaId]: { ...doEmpresa, [conta]: [...atuais, { ...tag, centroCusto, natureza }] } };
     });
   }
 

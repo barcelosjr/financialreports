@@ -9,12 +9,14 @@ function FormularioTag({ empresaId, conta, onFechar }) {
   const { obterNosEstrutura, adicionarTagConta } = useApp();
   const [relatorio, setRelatorio] = useState(RELATORIOS[0].chave);
   const [nodeId, setNodeId] = useState('');
+  const [centroCusto, setCentroCusto] = useState('');
+  const [natureza, setNatureza] = useState('');
 
   const opcoes = opcoesOrdenadas(obterNosEstrutura(empresaId, relatorio));
 
   function confirmar() {
     if (!nodeId) return;
-    adicionarTagConta(empresaId, conta, { relatorio, nodeId });
+    adicionarTagConta(empresaId, conta, { relatorio, nodeId, centroCusto, natureza });
     onFechar();
   }
 
@@ -30,6 +32,24 @@ function FormularioTag({ empresaId, conta, onFechar }) {
       <select className="input !py-1.5 text-xs flex-1 min-w-[200px]" value={nodeId} onChange={(e) => setNodeId(e.target.value)}>
         <option value="">— selecione o grupo —</option>
         {opcoes.map((o) => <option key={o.id} value={o.id}>{o.caminho}</option>)}
+      </select>
+      <input
+        className="input !py-1.5 text-xs !w-auto"
+        style={{ maxWidth: '9rem' }}
+        placeholder="Centro de custo (opcional)"
+        value={centroCusto}
+        onChange={(e) => setCentroCusto(e.target.value)}
+        title="Deixe em branco para a tag valer pra conta inteira, ou informe um centro de custo pra ela valer só quando o lançamento for desse centro de custo (ex: mesma conta 'Receita' apontando pra grupos diferentes por centro de custo)"
+      />
+      <select
+        className="input !py-1.5 !w-auto text-xs"
+        value={natureza}
+        onChange={(e) => setNatureza(e.target.value)}
+        title="Deixe em 'Qualquer natureza' para a tag valer pros dois lados, ou restrinja a débito/crédito"
+      >
+        <option value="">Qualquer natureza</option>
+        <option value="D">Débito (D)</option>
+        <option value="C">Crédito (C)</option>
       </select>
       <button className="btn-secondary !px-2.5 !py-1.5 text-xs" onClick={confirmar} disabled={!nodeId}>Adicionar</button>
       <button className="btn-ghost !p-1.5" onClick={onFechar} title="Cancelar">
@@ -249,11 +269,17 @@ export default function AbaContas({ empresa }) {
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {tags.map((tag, i) => (
                         <span
-                          key={`${tag.relatorio}-${tag.nodeId}`}
+                          key={`${tag.relatorio}-${tag.nodeId}-${tag.centroCusto ?? 'geral'}-${tag.natureza ?? 'geral'}`}
                           className="badge bg-info-50 text-info-600 dark:bg-info-600/15 dark:text-info-400 gap-1.5"
                         >
                           <span className="font-semibold">{RELATORIOS.find((r) => r.chave === tag.relatorio)?.label}:</span>
                           {caminhosPorRelatorio[tag.relatorio]?.get(tag.nodeId) ?? '(grupo removido)'}
+                          {tag.centroCusto && (
+                            <span className="text-info-500 dark:text-info-400/80 font-mono text-[10px]">CC {tag.centroCusto}</span>
+                          )}
+                          {tag.natureza && (
+                            <span className="text-info-500 dark:text-info-400/80 font-mono text-[10px]">{tag.natureza}</span>
+                          )}
                           <button onClick={() => removerTagConta(empresaId, c.conta, i)} className="hover:text-loss-600 dark:hover:text-loss-400" title="Remover tag">
                             <X size={11} />
                           </button>
