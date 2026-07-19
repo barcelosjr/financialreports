@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import RoleSwitcher from './RoleSwitcher';
 import { useApp } from '../context/AppContext';
+import { FLAGS } from '../data/flags';
 
 const TITULOS_POR_ROTA = [
   { prefixo: '/app/dashboard', titulo: 'Dashboard' },
@@ -22,11 +23,15 @@ const TITULOS_POR_ROTA = [
 ];
 
 export default function AppShell() {
-  const { autenticado } = useApp();
+  const { autenticado, carregandoSessao } = useApp();
   const [sidebarAberta, setSidebarAberta] = useState(false);
   const { pathname } = useLocation();
   const titulo = TITULOS_POR_ROTA.find((r) => pathname.startsWith(r.prefixo))?.titulo;
 
+  // Enquanto confirma um token já persistido (GET /auth/me), não redireciona
+  // pro login ainda -- senão todo reload de página pisca a tela de login
+  // antes da sessão real terminar de carregar.
+  if (carregandoSessao) return null;
   if (!autenticado) return <Navigate to="/login" replace />;
 
   return (
@@ -40,7 +45,7 @@ export default function AppShell() {
           </div>
         </main>
       </div>
-      <RoleSwitcher />
+      {!FLAGS.SESSAO && <RoleSwitcher />}
     </div>
   );
 }

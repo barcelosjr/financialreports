@@ -6,6 +6,15 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 const API_KEY = import.meta.env.VITE_API_KEY ?? '';
 
+// Token de sessão real (Fase 2, JWT) -- SessaoContext chama setSessionToken
+// sempre que login/logout/hidratação de página mudam o token. Enquanto não
+// há um (flag VITE_USE_BACKEND_SESSAO desligada, ou usuário deslogado), as
+// chamadas continuam com X-API-KEY (Fase 1), sem quebrar essa costura.
+let sessionToken = null;
+export function setSessionToken(token) {
+  sessionToken = token || null;
+}
+
 function montarQueryString(params) {
   if (!params) return '';
   const entradas = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '');
@@ -20,7 +29,7 @@ function montarUrl(path, params) {
 }
 
 async function request(method, path, { params, body } = {}) {
-  const headers = { 'X-API-KEY': API_KEY };
+  const headers = sessionToken ? { Authorization: `Bearer ${sessionToken}` } : { 'X-API-KEY': API_KEY };
   const init = { method, headers };
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json';

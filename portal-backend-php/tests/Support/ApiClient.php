@@ -21,6 +21,9 @@ class ApiClient
         if ($apiKey !== null) {
             $headers[] = 'X-API-KEY: ' . $apiKey;
         }
+        if (!empty($opts['bearer'])) {
+            $headers[] = 'Authorization: Bearer ' . $opts['bearer'];
+        }
 
         $body = null;
         if (array_key_exists('body', $opts)) {

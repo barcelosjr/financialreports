@@ -13,7 +13,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!email || !senha) {
       setErro('Informe e-mail e senha.');
@@ -21,10 +21,13 @@ export default function Login() {
     }
     setErro('');
     setCarregando(true);
-    setTimeout(() => {
-      login();
+    const resultado = await login(email, senha);
+    setCarregando(false);
+    if (resultado.ok) {
       navigate('/app/dashboard');
-    }, 500);
+    } else {
+      setErro(resultado.erro || 'Não foi possível entrar.');
+    }
   }
 
   return (

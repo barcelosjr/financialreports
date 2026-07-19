@@ -40,6 +40,11 @@ return [
     // tabela `cache` (sem processo em memoria em shared hosting).
     'CACHE_TTL_SECONDS' => 600,
 
+    // Segredo simetrico pra assinar/verificar os JWT de sessao (Fase 2).
+    // Gere um valor aleatorio de verdade (ex: `openssl rand -hex 32`) --
+    // nunca reutilize o daqui.
+    'JWT_SECRET' => 'troque-por-um-segredo-aleatorio-bem-longo',
+
     // Origem(ns) permitidas para CORS, separadas por virgula. Deixe vazio em
     // producao (mesma origem, sem CORS) e em dev (o proxy do Vite ja evita
     // CORS). Use "*" so se precisar testar sem o proxy.

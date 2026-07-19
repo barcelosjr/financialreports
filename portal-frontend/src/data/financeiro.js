@@ -300,6 +300,11 @@ export function buildFluxoCaixa(empresaId, periodo) {
 // --- Agregação entre empresas (grupo inteiro ou seleção) -------------------
 
 function somarLinhas(listas) {
+  // Lista vazia acontece de verdade agora: com o backend real (Fase 2), há
+  // uma folga entre o login resolver e GET /grupos terminar, em que
+  // empresaIdsEscopo é [] -- no mock isso nunca acontecia (grupos já
+  // vinham prontos no primeiro render).
+  if (listas.length === 0) return [];
   const [primeira, ...resto] = listas;
   return primeira.map((linha, i) => ({
     ...linha,

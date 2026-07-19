@@ -47,18 +47,17 @@ export default function UsuarioFormModal({ aberto, onClose, onSalvar, usuarioIni
 
   function handleSalvar() {
     if (!form.nome || !form.email || !form.grupoId) return;
+    // Shape "cru" (sem id gerado no cliente nem campos de telemetria) -- a
+    // página (Usuarios.jsx) decide, no modo mock, como completar o resto;
+    // no modo backend, o servidor é quem gera id/status/etc.
     onSalvar({
-      id: usuarioInicial?.id ?? `user-${Date.now()}`,
+      id: usuarioInicial?.id,
       nome: form.nome,
       email: form.email,
       papel: form.papel,
       grupoId: form.grupoId,
       empresasPermitidas: acessoTotal ? 'todas' : form.empresasPermitidas,
       relatoriosPermitidos: acessoTotal ? ['dre', 'balanco', 'fluxoCaixa'] : form.relatoriosPermitidos,
-      status: usuarioInicial?.status ?? 'convidado',
-      ultimoAcesso: usuarioInicial?.ultimoAcesso ?? null,
-      acessosMes: usuarioInicial?.acessosMes ?? 0,
-      relatoriosVisualizadosMes: usuarioInicial?.relatoriosVisualizadosMes ?? 0,
     });
     onClose();
   }
@@ -88,7 +87,7 @@ export default function UsuarioFormModal({ aberto, onClose, onSalvar, usuarioIni
           </div>
         </div>
 
-        {grupos.length > 1 && (
+        {grupoFixoId === undefined && (
           <div>
             <label className="label">Grupo econômico</label>
             <select className="input" value={form.grupoId} onChange={(e) => setForm((f) => ({ ...f, grupoId: e.target.value, empresasPermitidas: 'todas' }))}>

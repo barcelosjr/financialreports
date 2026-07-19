@@ -8,6 +8,7 @@ import { proximoIdNo, moverNoLista, removerNoComDescendentes, clonarArvore } fro
 import { usePersistedState } from '../lib/usePersistedState';
 import { apiGet, apiPost, apiPut, apiDelete } from '../data/api';
 import { FLAGS } from '../data/flags';
+import { codigoDaEmpresaRegistrada } from '../lib/empresaRegistry';
 
 // Estrutura de plano de contas (árvore editável por relatório), tags de
 // conta e importação de contas — tudo isolado do Tenant/Sessão, já que
@@ -65,8 +66,13 @@ export function EstruturaProvider({ children }) {
   function codigoDaEmpresa(empresaId) {
     // EstruturaProvider fica ACIMA de TenantProvider (não dá pra usar
     // useTenant() aqui) — o cache é chaveado pelo id sintético
-    // (ex: "kobe-comercio"), mas a API usa o código (ex: "001"). Lê do
-    // dado estático por enquanto; na Fase 2 troca pela lista viva de grupos.
+    // (ex: "kobe-comercio" no mock, um UUID de verdade com o backend), mas
+    // a API usa o código (ex: "001"). Com VITE_USE_BACKEND_TENANT ligado, os
+    // ids vêm do banco e não batem mais com data/empresas.js -- lê do
+    // registro vivo que TenantContext mantém atualizado (lib/empresaRegistry.js).
+    if (FLAGS.TENANT) {
+      return codigoDaEmpresaRegistrada(empresaId);
+    }
     return empresaPorId(empresaId)?.codigo ?? null;
   }
 

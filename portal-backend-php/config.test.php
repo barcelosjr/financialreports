@@ -32,4 +32,5 @@ return [
 
     'CACHE_TTL_SECONDS' => 600,
     'CORS_ORIGIN' => '',
+    'JWT_SECRET' => 'segredo-fixo-so-para-os-testes-nao-usar-em-producao',
 ];

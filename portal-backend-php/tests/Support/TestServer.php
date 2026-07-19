@@ -27,13 +27,27 @@ class TestServer
         $router = $publicDir . DIRECTORY_SEPARATOR . 'router.php';
         $configPath = realpath(__DIR__ . '/../../config.test.php');
 
-        $descriptors = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        // Redireciona stdout/stderr pra arquivos, não pipes: um pipe que
+        // ninguém lê enche o buffer do SO depois de umas dezenas de
+        // requests (log de acesso do servidor embutido, error_log(), etc.)
+        // -- daí o processo filho trava no write() esperando alguém
+        // esvaziar o pipe, e como o servidor é single-threaded, toda
+        // requisição seguinte fica pendurada. Arquivo não tem esse limite.
+        $logDir = sys_get_temp_dir();
+        $stdout = $logDir . DIRECTORY_SEPARATOR . 'portal-backend-php-test-server.out.log';
+        $stderr = $logDir . DIRECTORY_SEPARATOR . 'portal-backend-php-test-server.err.log';
+        $descriptors = [1 => ['file', $stdout, 'w'], 2 => ['file', $stderr, 'w']];
         // $_SERVER tem entradas não-string (ex: "argv") que o proc_open não
         // aceita como variável de ambiente -- filtra antes de repassar.
         $env = array_filter($_SERVER, static fn ($v) => is_string($v));
         $env['APP_CONFIG_PATH'] = $configPath;
 
-        $cmd = escapeshellarg(PHP_BINARY) . ' -S 127.0.0.1:8091 -t ' . escapeshellarg($publicDir) . ' ' . escapeshellarg($router);
+        // Comando em array (não string): no Windows, string faz o proc_open
+        // passar por cmd.exe, e terminar esse processo mata só o cmd.exe --
+        // o php.exe filho fica órfão, preso na porta 8091, e atrapalha a
+        // próxima rodada de testes (health-check bate nele e "funciona",
+        // mas é código de uma rodada anterior). Array evita o cmd.exe.
+        $cmd = [PHP_BINARY, '-S', '127.0.0.1:8091', '-t', $publicDir, $router];
         $process = proc_open($cmd, $descriptors, $pipes, null, $env);
 
         if (!is_resource($process)) {
@@ -63,7 +77,15 @@ class TestServer
     public static function stop(): void
     {
         if (self::$process !== null && is_resource(self::$process)) {
-            proc_terminate(self::$process);
+            $status = proc_get_status(self::$process);
+            $pid = $status['pid'] ?? null;
+            if ($pid !== null && stripos(PHP_OS, 'WIN') === 0) {
+                // /T mata a árvore de processos inteira -- defesa extra além
+                // do comando em array já evitar o cmd.exe como intermediário.
+                exec('taskkill /F /T /PID ' . (int) $pid . ' 2>NUL');
+            } else {
+                proc_terminate(self::$process);
+            }
             proc_close(self::$process);
         }
         self::$process = null;

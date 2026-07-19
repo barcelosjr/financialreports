@@ -14,7 +14,7 @@ class DbHelper
         return Db::pdo($config['DB']);
     }
 
-    /** Limpa as tabelas da Fase 1 -- equivalente a apagar o arquivo JSON temporário do Node entre testes. */
+    /** Limpa as tabelas de Fase 1 e Fase 2 -- equivalente a apagar o arquivo JSON temporário do Node entre testes. */
     public static function reset(): void
     {
         $pdo = self::pdo();
@@ -23,6 +23,9 @@ class DbHelper
         $pdo->exec('TRUNCATE classificacoes');
         $pdo->exec('TRUNCATE estruturas');
         $pdo->exec('TRUNCATE cache');
+        $pdo->exec('TRUNCATE usuarios');
+        $pdo->exec('TRUNCATE empresas');
+        $pdo->exec('TRUNCATE grupos');
         $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
     }
 }

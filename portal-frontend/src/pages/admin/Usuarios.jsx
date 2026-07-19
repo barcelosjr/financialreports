@@ -1,40 +1,121 @@
-import { useMemo, useState } from 'react';
-import { Plus, Pencil, MailPlus, Ban, CheckCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Pencil, MailPlus, Ban, CheckCircle, Copy, Check } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { usuarios as usuariosIniciais } from '../../data/usuarios';
 import { PAPEIS, RELATORIOS } from '../../data/constants';
 import { formatarDataRelativa } from '../../lib/format';
 import { PapelBadge, StatusBadge } from '../../components/Badge';
 import RequireAcesso from '../../components/RequireAcesso';
+import Modal from '../../components/Modal';
 import UsuarioFormModal from './UsuarioFormModal';
+import { apiGet, apiPost, apiPut } from '../../data/api';
+import { FLAGS } from '../../data/flags';
+
+function SenhaTemporariaModal({ dados, onClose }) {
+  const [copiado, setCopiado] = useState(false);
+
+  function copiar() {
+    navigator.clipboard?.writeText(dados.senha).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1500);
+    });
+  }
+
+  return (
+    <Modal
+      aberto={dados !== null}
+      onClose={onClose}
+      titulo="Usuário criado"
+      subtitulo="Repasse esta senha temporária pro usuário -- ela só aparece agora."
+      footer={<button className="btn-primary" onClick={onClose}>Fechar</button>}
+    >
+      {dados && (
+        <div className="space-y-3">
+          <p className="text-sm text-sand-600 dark:text-sand-300">
+            <span className="font-medium text-sand-800 dark:text-sand-100">{dados.nome}</span> ({dados.email}) já pode
+            entrar com a senha abaixo (troca-se o fluxo de convite por e-mail numa fase futura).
+          </p>
+          <div className="flex items-center gap-2 rounded-lg bg-sand-100 dark:bg-sand-800 px-3.5 py-2.5">
+            <code className="flex-1 text-sm font-mono text-sand-800 dark:text-sand-100">{dados.senha}</code>
+            <button className="btn-ghost !p-1.5" onClick={copiar} title="Copiar">
+              {copiado ? <Check size={15} className="text-gain-600" /> : <Copy size={15} />}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
 
 export default function Usuarios() {
   const { usuarioAtual, grupos: todosGrupos, grupoPorId } = useApp();
   const ehSuperAdmin = usuarioAtual.papel === PAPEIS.SUPER_ADMIN;
   const podeAdministrar = usuarioAtual.papel !== PAPEIS.USUARIO;
 
-  const [lista, setLista] = useState(usuariosIniciais);
+  const [listaMock, setListaMock] = useState(usuariosIniciais);
+  const [listaApi, setListaApi] = useState([]);
   const [filtroGrupo, setFiltroGrupo] = useState('todos');
   const [modal, setModal] = useState(null); // null | 'novo' | usuario
+  const [senhaGerada, setSenhaGerada] = useState(null); // null | { nome, email, senha }
 
+  useEffect(() => {
+    if (!FLAGS.TENANT || !podeAdministrar) return;
+    const grupoId = ehSuperAdmin && filtroGrupo !== 'todos' ? filtroGrupo : undefined;
+    apiGet('/usuarios', { params: grupoId ? { grupoId } : undefined })
+      .then(setListaApi)
+      .catch((err) => console.error('Falha ao carregar usuários:', err));
+  }, [ehSuperAdmin, filtroGrupo, podeAdministrar]);
+
+  const lista = FLAGS.TENANT ? listaApi : listaMock;
   const grupos = ehSuperAdmin ? todosGrupos : todosGrupos.filter((g) => g.id === usuarioAtual.grupoId);
   const papeisPermitidos = ehSuperAdmin ? [PAPEIS.ADMIN_GRUPO, PAPEIS.USUARIO] : [PAPEIS.USUARIO];
 
   const usuariosVisiveis = useMemo(() => {
     const base = ehSuperAdmin ? lista : lista.filter((u) => u.grupoId === usuarioAtual.grupoId);
-    if (ehSuperAdmin && filtroGrupo !== 'todos') return base.filter((u) => u.grupoId === filtroGrupo);
+    if (ehSuperAdmin && filtroGrupo !== 'todos' && !FLAGS.TENANT) return base.filter((u) => u.grupoId === filtroGrupo);
     return base;
   }, [lista, ehSuperAdmin, usuarioAtual.grupoId, filtroGrupo]);
 
-  function salvarUsuario(usuario) {
-    setLista((prev) => {
-      const existe = prev.some((u) => u.id === usuario.id);
-      return existe ? prev.map((u) => (u.id === usuario.id ? usuario : u)) : [usuario, ...prev];
+  function salvarUsuario(dados) {
+    if (FLAGS.TENANT) {
+      if (dados.id) {
+        apiPut(`/usuarios/${dados.id}`, { body: dados })
+          .then((atualizado) => setListaApi((prev) => prev.map((u) => (u.id === atualizado.id ? atualizado : u))))
+          .catch((err) => window.alert('Falha ao salvar usuário: ' + err.message));
+      } else {
+        apiPost('/usuarios', { body: dados })
+          .then(({ usuario, senhaTemporaria }) => {
+            setListaApi((prev) => [usuario, ...prev]);
+            setSenhaGerada({ nome: usuario.nome, email: usuario.email, senha: senhaTemporaria });
+          })
+          .catch((err) => window.alert('Falha ao criar usuário: ' + err.message));
+      }
+      return;
+    }
+
+    setListaMock((prev) => {
+      const anterior = prev.find((u) => u.id === dados.id);
+      const completo = {
+        ...dados,
+        id: dados.id ?? `user-${Date.now()}`,
+        status: anterior?.status ?? 'convidado',
+        ultimoAcesso: anterior?.ultimoAcesso ?? null,
+        acessosMes: anterior?.acessosMes ?? 0,
+        relatoriosVisualizadosMes: anterior?.relatoriosVisualizadosMes ?? 0,
+      };
+      return anterior ? prev.map((u) => (u.id === completo.id ? completo : u)) : [completo, ...prev];
     });
   }
 
   function alternarStatus(usuario) {
-    setLista((prev) => prev.map((u) => (u.id === usuario.id ? { ...u, status: u.status === 'inativo' ? 'ativo' : 'inativo' } : u)));
+    const novoStatus = usuario.status === 'inativo' ? 'ativo' : 'inativo';
+    if (FLAGS.TENANT) {
+      apiPut(`/usuarios/${usuario.id}`, { body: { status: novoStatus } })
+        .then((atualizado) => setListaApi((prev) => prev.map((u) => (u.id === atualizado.id ? atualizado : u))))
+        .catch((err) => window.alert('Falha ao atualizar status: ' + err.message));
+      return;
+    }
+    setListaMock((prev) => prev.map((u) => (u.id === usuario.id ? { ...u, status: novoStatus } : u)));
   }
 
   return (
@@ -134,6 +215,8 @@ export default function Usuarios() {
         papeisPermitidos={papeisPermitidos}
         grupoFixoId={!ehSuperAdmin ? usuarioAtual.grupoId : undefined}
       />
+
+      <SenhaTemporariaModal dados={senhaGerada} onClose={() => setSenhaGerada(null)} />
     </div>
     </RequireAcesso>
   );
