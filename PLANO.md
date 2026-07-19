@@ -39,61 +39,52 @@ por fases, as 4 "costuras" do frontend, e o `api.js`/flags.
 
 ---
 
-## Estado atual (pós Fase 0 + 1 — 18/07/2026)
+## Estado atual (pós Fase 0/1/2 — DEPLOYADO — 19/07/2026)
 
-**Fases 0 e 1 concluídas e validadas ponta a ponta** (UI + MySQL real), pelo
-Sonnet 5. O backend PHP (`portal-backend-php/`) espelha fielmente o Node; **76
-testes PHPUnit verdes** (portados do Jest). Ambiente de dev local documentado em
-memória (PHP 8.3 portátil, MySQL 8.4 noinstall, `php -S 127.0.0.1:8000`,
-`phpunit.phar` — **sem Composer**).
+**Fases 0, 1 e 2 concluídas, validadas ponta a ponta E no ar em produção**
+(`financialreports.com.br`), pelo Sonnet 5. Backend PHP (`portal-backend-php/`)
+espelha o Node; **111 testes PHPUnit verdes**. Dev local em memória (PHP 8.3
+portátil, MySQL 8.4 noinstall, `php -S`, `phpunit.phar` — **sem Composer**).
 
-**O que já existe (muda as próximas fases):**
-- Rotas de estrutura/classificações/contas idênticas ao Node (`src/routes.php`),
-  com `Estruturas`/`Classificacoes`/`ApiKeyAuth`/`Utils`/`MockData`.
-- **Plumbing de Power BI/Azure/cache JÁ PRONTO** (bônus p/ Fase 3):
-  `PowerBI::executeDaxQuery` (cURL + retry 401 + 429/timeout), `Auth::getAccessToken`
-  (token Azure cacheado), `Cache` (MySQL TTL com `ON DUPLICATE KEY`). Só falta
-  `queryBalancete` + motor de cálculo.
-- Front: `data/api.js` + `data/flags.js`; `EstruturaContext.jsx` em **modo duplo**
-  (flag `VITE_USE_BACKEND_ESTRUTURA`), leituras síncronas preservadas, adaptador
-  tag↔regra — **é o template a copiar** para Tenant/Sessão na Fase 2.
-- Padrões PHP estabelecidos: front controller (`public/index.php` remove o prefixo
-  `/api`), `Router` (casa `:param`), `Http` (query/body/header/sendJson/sendError),
-  `Db` (PDO singleton), classes de domínio estáticas, migrations numeradas,
-  `config.php` fora do git.
+**Costuras ligadas (modo-duplo, atrás de flag):**
+- ✅ **Sessão** (`SessaoContext.jsx`) — login JWT real, `/auth/me` na hidratação,
+  token em `localStorage` (`usePersistedState`); `api.js` manda `Bearer` após login,
+  senão `X-API-KEY`. 1º super_admin via `POST /api/auth/bootstrap`.
+- ✅ **Tenant** (`TenantContext.jsx`) — grupos/empresas via API.
+- ✅ **Estrutura** (`EstruturaContext.jsx`) — plano de contas (Fase 1).
+- ⬜ **Financeiro** (`data/financeiro.js`) — **ainda mock** (Fase 3). Em produção
+  `VITE_USE_BACKEND_FINANCEIRO=false`; os outros três `=true`.
 
-**Higiene antes de seguir (recomendado):**
-- **Commitar** o trabalho — hoje está tudo *uncommitted* (novo `portal-backend-php/`,
-  `PLANO.md`, `api.js`, `flags.js`, `.env.example`; modificados `EstruturaContext.jsx`,
-  `vite.config.js`). Fazer numa branch, não direto na `main`.
-- **Remover** os arquivos de debug soltos em `portal-backend-php/`: `err.txt`,
-  `err2.txt`, `out.txt`, `out2.txt` (e ignorar `*.txt`/`*.tmp` no `.gitignore`).
-- Conferir que `.env.local` (tem `VITE_API_KEY`) fica fora do git (`*.local` já
-  ignora) e que `.env.example` entra no commit.
+**Backend PHP existente:** rotas health/auth (bootstrap/login/me)/grupos/empresas/
+usuários/estrutura/contas (`src/routes.php`); RBAC (`SessionAuth`, aceita **Bearer
+OU X-API-KEY**); `Grupos`/`Tenancy`/`Usuarios`/`Jwt` (HS256 self-contained, sem
+Composer). **Bônus já pronto p/ Fase 3:** `PowerBI::executeDaxQuery` (cURL+retry+
+429/timeout), `Auth::getAccessToken` (token Azure cacheado), `Cache` (MySQL TTL).
+Falta só `queryBalancete` + motor de cálculo + rotas de relatório.
 
-**Ainda NÃO validado — o deploy real na Hostinger.** Todo o teste até aqui foi
-local. O ambiente Premium (mod_rewrite/`.htaccess`, versão do PHP no hPanel, MySQL
-via hPanel, headers `X-API-KEY`/`Authorization` chegando ao PHP, cURL de saída p/
-Azure) segue não provado.
+**Decisão de modelagem da Fase 3 (usuário, 19/07): estrutura LIVRE por empresa —
+sem template padrão.** "Cada empresa é uma realidade." O **admin do grupo** monta a
+estrutura e **replica para todas as empresas do grupo**; depois pode **alterar uma
+empresa específica** sem afetar as outras. *(Já quase todo suportado: a estrutura é
+por-empresa e independente; `POST /contabil/contas/copiar` copia estrutura+
+classificações de uma empresa p/ outra — "replicar p/ todas" = repetir a cópia para
+cada empresa do grupo; falta só a ação de conveniência no front.)* **Consequência
+que molda a Fase 3:** os **demonstrativos** saem direto da árvore livre, mas as
+**análises** (que leem grandezas semânticas fixas) exigem uma camada de mapeamento
+→ ver Fase 3a/3b.
 
-**➡️ Próximo passo (decidido pelo usuário): smoke deploy na Hostinger, antes da
-Fase 2.** É um passo **colaborativo** — o Sonnet 5 é headless (sem GUI nem acesso
-ao hPanel), então ele prepara os artefatos + o guia, e **o usuário** faz as ações
-no painel. Antes, a **higiene**: commitar a Fase 0+1 numa branch e remover os
-`err/out*.txt`.
-
-1. **Sonnet 5 prepara:** SPA mínima (ou o `npm run build`) que chame `/api/health`
-   e mostre o resultado + `.htaccess` de fallback SPA; a pasta `api/` (conteúdo de
-   `public/`) + `.htaccess` + `config.php` preenchível; o SQL das migrations
-   (`001`+`002`); e um passo a passo do hPanel.
-2. **Usuário (hPanel):** criar banco MySQL + usuário (anotar credenciais), rodar as
-   migrations no phpMyAdmin, escolher PHP 8.x, subir os arquivos (File Manager/FTP/
-   Git) para `public_html/` e `public_html/api/`, pôr o `config.php` **fora** do
-   web root, ativar SSL.
-3. **Validar:** `https://financialreports.com.br/api/health` → `{"status":"ok"}`;
-   depois criar/ler um nó de estrutura pela API e conferir no phpMyAdmin.
-4. **Gotchas a confirmar:** `.htaccess`/mod_rewrite ativo, header `X-API-KEY`
-   chegando ao PHP, e (só ao testar Power BI, Fase 3) cURL de saída liberado.
+**Loose ends antes/durante a Fase 3:**
+- Branch `feature/backend-php-fase-0-1` tem 3 commits **não mergeados na `main` nem
+  enviados** (`git push`). Decidir merge/push (e os 2 arquivos novos em `deploy/`
+  ainda uncommitted).
+- `.env.local` (dev) está com os 4 flags `=false` (dev roda mock puro); para
+  desenvolver a Fase 3 vai precisar ligar `SESSAO/TENANT/ESTRUTURA/FINANCEIRO`.
+- `.env.production.local` tem `VITE_API_KEY` placeholder — ok enquanto SESSAO=true
+  (usa Bearer após login), mas confirmar.
+- **Dado real:** o `MockData` só tem 2 contas (empresas `001`/`002`). Para validar
+  DRE/Balanço reais, **expandir as fixtures** OU **ligar o Power BI real** (SP
+  `portal-site-powerbi`, workspace DIRETORIA, dataset `lancamentos_contabeis` — ver
+  memória) preenchendo `config['AZURE']` em produção.
 
 ---
 
@@ -304,26 +295,57 @@ escreve o erro, rotas em `src/routes.php`).
   copie para `HTTP_AUTHORIZATION`). Validar no smoke deploy.
 - **Real:** Login, Grupos e Empresas, Usuários e acessos.
 
-### Fase 3 — Relatórios + Análises (a parte pesada, em PHP)
+### Fase 3 — Relatórios + Análises (a parte pesada). Dividida em 3a e 3b pela decisão "estrutura livre".
 
-**Já pronto na Fase 1** (não precisa refazer): `PowerBI::executeDaxQuery` (cURL +
-retry 401 + 429/timeout), `Auth::getAccessToken` (token Azure cacheado em MySQL),
-`Cache` (TTL). Então falta:
-- `PowerBI::queryBalancete` — portar a query DAX de balancete de `powerbi.js`, com
-  o mesmo `MOCK_MODE` já usado em `queryContasUnicas`.
-- **Motor de cálculo** (`src/ReportEngine.php`): aplica estrutura + classificações
-  ao balancete e produz as linhas de DRE/Balanço/Fluxo. Rotas
-  `GET /api/reports/{dre,balanco,fluxoCaixa}?empresa=&periodoInicio=&periodoFim=`.
-- **Ponto crítico de modelagem (o maior trabalho restante):** as análises leem IDs
-  de linha semânticos fixos (`subtotal-receita-liquida`, `caixa-equivalentes`,
-  `emprestimos-cp`…). Reproduzi-los exige um **template de relatório canônico**
-  (com esses códigos) como estrutura padrão + cada conta classificada para uma
-  dessas linhas.
-- **Frontend:** `financeiro.js` vira cliente `fetch` devolvendo **o mesmo shape** de
-  hoje (atrás de `VITE_USE_BACKEND_FINANCEIRO`); `indicadores/risco/previsao/
-  orcamento` **não mudam**. Sub-faseável: DRE → Balanço → Fluxo.
-- **Testes:** fixtures de balancete no `MockData` + casos do motor de cálculo
-  (comparar as linhas com um relatório real).
+Com **estrutura livre por empresa** (sem template canônico), os **demonstrativos**
+saem naturalmente da árvore do usuário, mas as **análises** (que leem grandezas
+semânticas fixas) precisam de uma camada de mapeamento. Daí duas sub-fases.
+**Já pronto (não refazer):** `PowerBI::executeDaxQuery`, `Auth::getAccessToken`, `Cache`.
+
+#### Fase 3a — Demonstrativos (DRE/Balanço/Fluxo) da árvore livre — alinhado à decisão, fazer primeiro
+- **Backend:** `PowerBI::queryBalancete` (portar a DAX de `powerbi.js`, com o mesmo
+  `MOCK_MODE`) + **`src/ReportEngine.php`** que percorre a **estrutura da empresa**
+  (nós + `sinal` +/-/=), soma o saldo das contas **classificadas** em cada nó (via
+  `classificacoes`/`classificacao_tags`, respeitando natureza/centro de custo da
+  regra) e faz a cascata de subtotais/totais — mesma lógica de
+  `financeiro.js#computeLinhas`, mas sobre a árvore real, não sobre blocos fixos.
+- Rotas `GET /api/reports/{dre,balanco,fluxoCaixa}?empresa=&periodoInicio=&periodoFim=`
+  devolvendo **uma coluna por período** (a faixa inteira numa chamada — as telas e
+  as análises precisam da série, não de um mês só).
+- **Frontend:** as 3 telas de relatório passam a renderizar as **linhas vindas do
+  backend** (a árvore do usuário), atrás de `VITE_USE_BACKEND_FINANCEIRO`. Os
+  ajudantes genéricos que já existem (`construirTabelaPeriodos`, AH/AV/média) operam
+  sobre "linhas" genéricas → continuam servindo; só a **base da Análise Vertical**
+  (hoje `subtotal-receita-liquida`) precisa ser escolhida (nó marcado, ou 1ª linha
+  de receita).
+- **Carga assíncrona (principal esforço de front):** `financeiro.js` é **síncrono**
+  e lido em muitas telas; com backend vira async. Criar um **loader/cache**
+  (ex.: `FinanceiroContext`, no espírito do modo-duplo do `EstruturaContext`) que
+  **pré-carrega** a série do escopo (empresas do escopo × faixa de períodos) e serve
+  síncrono às telas — incluindo os 12 meses que previsão/volatilidade/sparklines usam.
+
+#### Fase 3b — Análises (indicadores/risco/previsão/orçado) — o custo da estrutura livre
+As análises precisam de ~30 grandezas nomeadas (Receita Líquida, EBITDA, Caixa,
+Contas a Receber, Empréstimos CP/LP, PL…). Com árvore livre, o backend não sabe qual
+nó é "Caixa". Solução: **papel analítico opcional por nó** —
+- No Plano de Contas, o admin marca (dropdown, vocabulário fixo) quais linhas são
+  Receita Líquida, EBITDA, Caixa, etc. — só as que quiser; o que faltar → indicador
+  "n/d" (as análises já tratam `null`/`NaN` sem quebrar).
+- **Backend:** coluna `papel` em `estruturas` (ou tabela `papeis_no`); o
+  `ReportEngine` expõe "valor por papel".
+- **Frontend:** os lookups centralizados em `indicadores.js`/`risco.js`/`orcamento.js`
+  (`porId(...)`, `contaDe(...)`) passam a resolver **por papel** em vez de ID fixo —
+  refatoração contida (concentrada em poucos helpers, ex.: `coletarDados`).
+- **Degradação graciosa:** mapeamento parcial já dá análises parciais; completa com o
+  tempo, sem bloquear a 3a.
+
+**Sequência recomendada:** 3a primeiro (entrega os 3 demonstrativos reais + Dashboard
+de resultado); 3b em seguida (liga as 4 telas de análise). 3a pode subir sozinho com
+as telas de análise ainda em mock.
+
+- **Dado p/ testar:** expandir as fixtures do `MockData` para um plano de contas
+  plausível (várias contas por empresa/período) **ou** ligar o Power BI real
+  (`config['AZURE']`), já que hoje só há 2 contas.
 
 ### Fase 4 — Telemetria, config e "próximos passos"
 - Uso por usuário (log de acesso em MySQL), Configurações persistidas, cadastro
@@ -387,8 +409,12 @@ Estrutura de pastas (shared hosting; colocar código sensível **acima** de `pub
 - **Fase 2:** login com usuário provisionado; como `usuario` comum, rota admin
   bloqueada (`RequireAcesso` + RBAC do servidor); `GET /api/auth/me` reflete
   permissões.
-- **Fase 3:** comparar uma DRE do backend com a do Power BI/planilha real;
-  Indicadores/Risco/Previsão batem com a DRE exibida.
+- **Fase 3a:** montar uma estrutura numa empresa, classificar contas, e conferir que
+  a DRE/Balanço/Fluxo do backend batem com um relatório real (Power BI/planilha) e
+  com a soma dos saldos por nó; reload persiste; a série de períodos vem numa chamada.
+- **Fase 3b:** marcar os papéis analíticos das linhas e conferir que Indicadores/
+  Risco/Previsão/Orçado passam de "n/d" para valores coerentes com a DRE exibida;
+  linhas sem papel ficam "n/d" sem quebrar a tela.
 - **Testes automatizados:** portar os casos de `portal-backend/tests/**` (Jest)
   para **PHPUnit** em `portal-backend-php/tests/**` (mesmos cenários: 400/401/403,
   contrato das rotas). Manter os Vitest do front (`portal-frontend/src/**/__tests__`).
